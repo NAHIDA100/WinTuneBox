@@ -272,8 +272,9 @@ namespace WinTune
                 return "未能启用“卓越性能”（当前 Windows 版本未提供该隐藏方案，自动创建替代也失败）：\n" + (dup0 ?? r0);
             }
 
-            // 2) 常规计划：先按名称复用现有计划
+            // 2) 常规计划：先按名称复用现有计划（激活失败继续尝试其他同名项）
             string list = Runner.Run("powercfg.exe", "/list", 15000);
+            string lastErr = null;
             if (list != null)
             {
                 foreach (string line in list.Split('\n'))
@@ -285,13 +286,13 @@ namespace WinTune
                         {
                             string r = Runner.Run("powercfg.exe", "/setactive " + guid, 10000);
                             if (r == null) return null;
-                            return "切换失败: " + r;
+                            lastErr = r;
                         }
                     }
                 }
             }
 
-            // 3) 系统确实没有 → 用别名复制一个再激活
+            // 3) 系统确实没有（或全失败）→ 用别名复制一个再激活
             string alias = "SCHEME_BALANCED";
             if (targetName == "高性能") alias = "SCHEME_MIN";
             if (targetName == "节能") alias = "SCHEME_SAVER";
@@ -303,16 +304,22 @@ namespace WinTune
                 if (r2 == null) return null;
                 return "切换失败: " + r2;
             }
-            return "未能找到/创建“" + targetName + "”电源计划：\n" + outp;
+            return "未能找到/创建“" + targetName + "”电源计划：\n" + outp +
+                (lastErr != null ? "\n（激活已有同名计划也失败: " + lastErr + "）" : "");
         }
 
+        static readonly System.Text.RegularExpressions.Regex GuidRe =
+            new System.Text.RegularExpressions.Regex(
+                "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+
+        /// <summary>从 powercfg 输出中提取电源计划 GUID。
+        /// 注意：/list 与 /duplicatescheme 输出的 GUID 不带花括号（只有 /getactivescheme 带），
+        /// 直接匹配裸 8-4-4-4-12 格式兼容两种输出。</summary>
         static string ExtractGuid(string text)
         {
             if (string.IsNullOrEmpty(text)) return null;
-            int p1 = text.IndexOf('{');
-            int p2 = text.IndexOf('}', p1 + 1);
-            if (p1 >= 0 && p2 > p1) return text.Substring(p1, p2 - p1 + 1);
-            return null;
+            var m = GuidRe.Match(text);
+            return m.Success ? m.Value : null;
         }
 
         // ── 安全模式 ──

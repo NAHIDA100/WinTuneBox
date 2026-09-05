@@ -10,7 +10,7 @@ namespace WinTune
     // ═══ 主窗体：左侧导航 + 内容区 ═══
     public class FrmMain : Form
     {
-        public const string Ver = "1.0.11";
+        public const string Ver = "1.0.12";
         public const string AppName = "Windows 优化工具箱";
 
         const int SIDEBAR_W = 186;

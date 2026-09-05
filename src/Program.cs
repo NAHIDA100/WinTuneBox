@@ -40,8 +40,9 @@ namespace WinTune
                     if (string.Equals(a, "--minimized", StringComparison.OrdinalIgnoreCase))
                         StartMinimized = true;
 
-            // 免责声明：绿色版首次启动弹窗；安装版由安装器写入已同意标记
-            if (!CheckDisclaimer(StartMinimized))
+            // 免责声明：绿色版首次启动弹窗；安装版由安装器写入已同意标记。
+            // allowDialog = 允许弹窗 = 非静默模式（静默启动不打扰，未同意则退出）
+            if (!CheckDisclaimer(!StartMinimized))
                 return;   // 拒绝同意或静默启动且未同意 → 不启动
 
             // 内存优化实测：--memprobe（跑一次并写 selftest-mem.txt，验证清理量）

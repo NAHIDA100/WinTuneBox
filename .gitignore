@@ -6,3 +6,4 @@ dist/_check.dll
 *.user
 Thumbs.db
 dist/uitest/
+dist/selftest-mem.txt

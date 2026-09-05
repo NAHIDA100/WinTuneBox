@@ -19,6 +19,7 @@ namespace WinTune
         readonly Label _memNow = new Label();
         readonly Label _memResult = new Label();
         readonly CheckBox _chkTray = new CheckBox();
+        readonly CheckBox _chkPin = new CheckBox();
         FlatBtn _btnMem;
         bool _memBusy;
         bool _built;
@@ -179,7 +180,49 @@ namespace WinTune
             };
             row2.Controls.Add(_chkTray);
             cm.Controls.Add(row2);
-            CardNote(cm, "优化原理与 PCL 启动器一致：清空各进程的工作集内存，系统会把这些页面转为可用内存。程序重新读写时会自然恢复，属正常现象。");
+
+            // 让图标固定在托盘可见区：系统级“始终显示所有托盘图标”
+            var row3 = new Panel { Dock = DockStyle.Top, Height = C.S(30) };
+            _chkPin.Text = "让本工具图标固定显示在托盘可见区（开启系统“始终显示所有图标”，无需再点 ^ 展开）";
+            _chkPin.Font = C.F(9f);
+            _chkPin.AutoSize = true;
+            _chkPin.ForeColor = C.TextMain;
+            _chkPin.Location = new Point(0, C.S(2));
+            try
+            {
+                int? v = Regs.Dword(RegistryHive.CurrentUser, RegistryView.Default,
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer", "EnableAutoTray");
+                _chkPin.Checked = v != null && v.Value == 1;
+            }
+            catch { }
+            _chkPin.CheckedChanged += delegate
+            {
+                try
+                {
+                    if (_chkPin.Checked)
+                        Regs.SetDword(RegistryHive.CurrentUser, RegistryView.Default,
+                            @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer", "EnableAutoTray", 1);
+                    else
+                        Regs.DelVal(RegistryHive.CurrentUser, RegistryView.Default,
+                            @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer", "EnableAutoTray");
+                }
+                catch { }
+            };
+            row3.Controls.Add(_chkPin);
+            var pinBtn = C.Btn("重启资源管理器生效", 1);
+            pinBtn.AutoSize = false;
+            pinBtn.Width = C.S(170);
+            pinBtn.Location = new Point(C.S(560), 0);
+            pinBtn.Click += delegate
+            {
+                if (C.Ask("将重启资源管理器使托盘设置生效。\n桌面上会短暂刷新，已打开的资源管理器窗口会关闭。确定？",
+                        "重启资源管理器", true) != DialogResult.Yes) return;
+                SysTools.RestartExplorer();
+            };
+            row3.Controls.Add(pinBtn);
+            cm.Controls.Add(row3);
+
+            CardNote(cm, "优化原理与 PCL 启动器一致：清空各进程的工作集内存，系统会把这些页面转为可用内存。程序重新读写时会自然恢复，属正常现象。\n说明：“固定显示”会同时展开系统其他被隐藏的托盘图标（Win10/7 有效）；Win11 请到 设置→个性化→任务栏→任务栏角落图标 中把本程序设为“显示”，或将图标从 ^ 折叠区拖出一次即可固定。");
             return cm;
         }
 

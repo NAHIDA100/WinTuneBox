@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
@@ -46,6 +47,62 @@ namespace WinTune
             POINT p;
             GetCursorPos(out p);
             return new Point(p.X, p.Y);
+        }
+
+        // ── 前台全屏检测（游戏等全屏应用期间隐藏悬浮球）──
+        [DllImport("user32.dll")]
+        static extern IntPtr GetForegroundWindow();
+        [StructLayout(LayoutKind.Sequential)]
+        struct RECT { public int L, T, R, B; }
+        [DllImport("user32.dll")]
+        static extern bool GetWindowRect(IntPtr h, out RECT r);
+        bool _hiddenByFullscreen;
+
+        bool IsFullscreenApp()
+        {
+            try
+            {
+                IntPtr fg = GetForegroundWindow();
+                if (fg == IntPtr.Zero || fg == Handle) return false;
+                // 排除本进程其它窗口（主界面/托盘消息窗）
+                if (fg == FindWindowOfThisProcess()) return false;
+                RECT r;
+                if (!GetWindowRect(fg, out r)) return false;
+                int w = r.R - r.L, h = r.B - r.T;
+                if (w <= 0 || h <= 0) return false;
+                foreach (Screen s in Screen.AllScreens)
+                {
+                    var wa = s.WorkingArea;
+                    // 覆盖整个工作区（含任务栏自动隐藏时盖满全屏）即视为全屏
+                    if (w >= wa.Width - 4 && h >= wa.Height - 4 &&
+                        r.L <= wa.X + 4 && r.T <= wa.Y + 4) return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        IntPtr _ownWin;
+        IntPtr FindWindowOfThisProcess()
+        {
+            if (_ownWin == IntPtr.Zero)
+            {
+                try
+                {
+                    int pid = System.Diagnostics.Process.GetCurrentProcess().Id;
+                    foreach (Process pr in Process.GetProcesses())
+                    {
+                        try
+                        {
+                            if (pr.Id != pid) continue;
+                            if (pr.MainWindowHandle != IntPtr.Zero) { _ownWin = pr.MainWindowHandle; break; }
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+            }
+            return _ownWin;
         }
 
         public FloatBall()
@@ -220,6 +277,27 @@ namespace WinTune
         // ═══ 低占用空闲监测（500ms 一次）═══
         void SlowTick(object s, EventArgs e)
         {
+            // 前台有全屏应用（游戏/视频等）时暂时隐藏悬浮球，退出全屏自动恢复
+            if (IsFullscreenApp())
+            {
+                if (!_hiddenByFullscreen)
+                {
+                    _hiddenByFullscreen = true;
+                    try { Hide(); } catch { }
+                }
+                return;
+            }
+            if (_hiddenByFullscreen)
+            {
+                _hiddenByFullscreen = false;
+                try
+                {
+                    Show();
+                    Opacity = _op;
+                }
+                catch { }
+                return;
+            }
             if (_dragging || _st == St.Moving) return;
             Point mp = CursorScreen();
             Rectangle near = new Rectangle(Location.X - C.S(36), Location.Y - C.S(36),

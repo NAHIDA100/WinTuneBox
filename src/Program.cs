@@ -10,6 +10,7 @@ namespace WinTune
     {
         public const string MutexName = @"Local\WinTuneBox_SingleInstance";
         static Mutex _instanceMutex;
+        public static bool StartMinimized;   // --minimized：静默启动到托盘（开机自启用）
 
         [DllImport("user32.dll")]
         static extern bool SetProcessDPIAware();
@@ -33,6 +34,11 @@ namespace WinTune
                 SelfTest.UiDump();
                 return;
             }
+            // 静默启动到托盘（开机自启场景）
+            if (args != null)
+                foreach (string a in args)
+                    if (string.Equals(a, "--minimized", StringComparison.OrdinalIgnoreCase))
+                        StartMinimized = true;
             // 内存优化实测：--memprobe（跑一次并写 selftest-mem.txt，验证清理量）
             if (args != null && args.Length > 0 && args[0].IndexOf("memprobe", StringComparison.OrdinalIgnoreCase) >= 0)
             {
@@ -50,7 +56,7 @@ namespace WinTune
             }
             try { OS.CollectInfo(); } catch { }
             try { OS.RefreshMem(); } catch { }
-            Application.Run(new FrmMain());
+            Application.Run(new FrmMain(StartMinimized));
             ReleaseInstance();
         }
 

@@ -10,7 +10,7 @@ namespace WinTune
     // ═══ 主窗体：左侧导航 + 内容区 ═══
     public class FrmMain : Form
     {
-        public const string Ver = "1.0.12";
+        public const string Ver = "1.0.13";
         public const string AppName = "Windows 优化工具箱";
 
         const int SIDEBAR_W = 186;
@@ -28,14 +28,17 @@ namespace WinTune
         bool _trayOptBusy;
         DateTime _lastTrayLeft = DateTime.MinValue;
         bool _trayPendingClick;                    // 单击防抖：350ms 内第二次单击视为双击
+        bool _startMin;                            // --minimized：静默启动到托盘
+        bool _trayCloseHinted;                     // 关闭到托盘首次提示
         FloatBall _ball;                           // 加速悬浮球
         uint _taskbarMsg;                          // TaskbarCreated：Explorer 重启后需重注册托盘图标
 
         [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
         static extern uint RegisterWindowMessageW(string lpString);
 
-        public FrmMain()
+        public FrmMain(bool minimized = false)
         {
+            _startMin = minimized;
             Text = AppName + "  v" + Ver;
             BackColor = C.PageBg;
             AutoScaleMode = AutoScaleMode.None;
@@ -44,6 +47,12 @@ namespace WinTune
             StartPosition = FormStartPosition.CenterScreen;
             Font = C.F(9f);
             DoubleBuffered = true;
+            if (_startMin)
+            {
+                // 静默启动：先不透明度归零再隐藏，避免开机瞬间闪窗
+                Opacity = 0;
+                ShowInTaskbar = false;
+            }
 
             // ── 侧边栏 ──
             var sidebar = new Panel
@@ -166,10 +175,44 @@ namespace WinTune
             {
                 Go(0);
                 UpdatePerm();
+                if (_startMin)
+                {
+                    // 静默模式：确保托盘在 → 隐藏主窗口（右下角只留托盘图标）
+                    if (_tray == null) TraySet(true);
+                    try
+                    {
+                        Opacity = 1;
+                        Hide();
+                    }
+                    catch { }
+                    return;
+                }
                 if (!OS.IsElevated)
                     MessageBox.Show(this,
                         "当前未以管理员身份运行。\n\n绝大多数优化/清理功能（服务、注册表 HKLM、hosts、系统修复）需要管理员权限。\n可在左侧底部“以管理员身份运行”处一键提权重启，普通浏览不受影响。",
                         "权限提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            };
+
+            // 托盘启用时：点 X = 最小化到托盘（右键托盘→退出 才是真正退出）
+            FormClosing += delegate(object s, FormClosingEventArgs e)
+            {
+                if (e.CloseReason == CloseReason.UserClosing && _tray != null)
+                {
+                    e.Cancel = true;
+                    Hide();
+                    if (!_trayCloseHinted)
+                    {
+                        _trayCloseHinted = true;
+                        try
+                        {
+                            _tray.BalloonTipTitle = "已在后台继续运行";
+                            _tray.BalloonTipText = "点击右上角 × 只会最小化到托盘，内存优化/悬浮球等功能仍在工作。\n要完全退出请右键托盘图标 → 退出。";
+                            _tray.ShowBalloonTip(3000);
+                        }
+                        catch { }
+                    }
+                    return;
+                }
             };
 
             // 若上次启用了托盘/悬浮球常驻，本次自动恢复
@@ -337,6 +380,8 @@ namespace WinTune
         {
             if (InvokeRequired) { try { BeginInvoke((MethodInvoker)ShowMain); } catch { } return; }
             if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+            ShowInTaskbar = true;         // 静默模式关闭了任务栏按钮，打开主界面时恢复
+            try { Opacity = 1; } catch { }
             Show();
             BringToFront();
             Activate();

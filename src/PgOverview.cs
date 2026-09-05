@@ -22,7 +22,19 @@ namespace WinTune
         readonly CheckBox _chkTray = new CheckBox();
         readonly CheckBox _chkPin = new CheckBox();
         readonly CheckBox _chkBall = new CheckBox();
+        CheckBox _chkAuto;
         static readonly ToolTip _tipBox = new ToolTip();
+
+        public const string AutoStartValue = "Windows 优化工具箱";
+        static bool AutoStartEnabled()
+        {
+            try
+            {
+                string v = Regs.Str(RegistryHive.CurrentUser, RegistryView.Default, Regs.HK_RUN, AutoStartValue);
+                return !string.IsNullOrEmpty(v);
+            }
+            catch { return false; }
+        }
         FlatBtn _btnMem;
         bool _memBusy;
         bool _built;
@@ -183,6 +195,33 @@ namespace WinTune
             };
             row2.Controls.Add(_chkTray);
             cm.Controls.Add(row2);
+
+            // 开机自启动（静默启动到托盘）
+            var rowAuto = new Panel { Dock = DockStyle.Top, Height = C.S(30) };
+            _chkAuto = new CheckBox
+            {
+                Text = "开机自启动（静默运行到托盘；点 × 仅最小化到托盘）",
+                Font = C.F(9f),
+                AutoSize = true,
+                ForeColor = C.TextMain,
+                Location = new Point(0, C.S(2)),
+            };
+            _chkAuto.Checked = AutoStartEnabled();
+            _chkAuto.CheckedChanged += delegate
+            {
+                if (_chkAuto.Checked)
+                {
+                    if (!_chkTray.Checked) _chkTray.Checked = true;   // 自启需托盘兜底（联动开启）
+                    Regs.SetStr(RegistryHive.CurrentUser, RegistryView.Default, Regs.HK_RUN,
+                        AutoStartValue, "\"" + Application.ExecutablePath + "\" --minimized");
+                }
+                else
+                {
+                    Regs.DelVal(RegistryHive.CurrentUser, RegistryView.Default, Regs.HK_RUN, AutoStartValue);
+                }
+            };
+            rowAuto.Controls.Add(_chkAuto);
+            cm.Controls.Add(rowAuto);
 
             // 让图标固定在托盘可见区：系统级“始终显示所有托盘图标”
             var row3 = new Panel { Dock = DockStyle.Top, Height = C.S(30) };

@@ -8,6 +8,9 @@ namespace WinTune
 {
     static class Program
     {
+        public const string MutexName = @"Local\WinTuneBox_SingleInstance";
+        static Mutex _instanceMutex;
+
         [DllImport("user32.dll")]
         static extern bool SetProcessDPIAware();
 
@@ -32,19 +35,40 @@ namespace WinTune
             }
 
             bool mutexOk;
-            using (var m = new Mutex(true, @"Local\WinTuneBox_SingleInstance", out mutexOk))
+            _instanceMutex = new Mutex(true, MutexName, out mutexOk);
+            if (!mutexOk)
             {
-                if (!mutexOk)
-                {
-                    MessageBox.Show("Windows 优化工具箱已在运行。", "提示",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
-                }
-                try { OS.CollectInfo(); } catch { }
-                try { OS.RefreshMem(); } catch { }
-                Application.Run(new FrmMain());
-                GC.KeepAlive(m);
+                MessageBox.Show("Windows 优化工具箱已在运行。", "提示",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
             }
+            try { OS.CollectInfo(); } catch { }
+            try { OS.RefreshMem(); } catch { }
+            Application.Run(new FrmMain());
+            ReleaseInstance();
+        }
+
+        /// <summary>释放单实例互斥锁（提权重启前必须先释放，否则新实例会提示“已在运行”）</summary>
+        public static void ReleaseInstance()
+        {
+            var m = _instanceMutex;
+            _instanceMutex = null;
+            if (m == null) return;
+            try { m.ReleaseMutex(); } catch { }
+            try { m.Dispose(); } catch { }
+        }
+
+        /// <summary>重新获取互斥锁（提权被取消时恢复）；false=期间已有别的实例启动</summary>
+        public static bool ReacquireInstance()
+        {
+            if (_instanceMutex != null) return true;
+            bool ok;
+            try { _instanceMutex = new Mutex(true, MutexName, out ok); }
+            catch { return false; }
+            if (ok) return true;
+            try { _instanceMutex.Dispose(); } catch { }
+            _instanceMutex = null;
+            return false;
         }
     }
 

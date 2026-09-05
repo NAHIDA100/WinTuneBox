@@ -9,7 +9,7 @@ namespace WinTune
     // ═══ 主窗体：左侧导航 + 内容区 ═══
     public class FrmMain : Form
     {
-        public const string Ver = "1.0.0";
+        public const string Ver = "1.0.1";
         public const string AppName = "Windows 优化工具箱";
 
         const int SIDEBAR_W = 186;
@@ -186,9 +186,20 @@ namespace WinTune
             _pages[idx].OnShown();
         }
 
-        /// <summary>以管理员身份重启自身</summary>
+        /// <summary>以管理员身份重启自身。
+        /// 顺序很关键：先释放单实例互斥锁再启动新进程，否则新实例会提示“已在运行”并退出；
+        /// 若用户取消 UAC，则重新拿回互斥锁并恢复窗口。</summary>
         public static void ElevateSelf()
         {
+            // 1. 隐藏当前窗口，准备交接
+            var frm = Application.OpenForms.Count > 0 ? Application.OpenForms[0] : null;
+            if (frm != null) frm.Hide();
+
+            // 2. 先释放单实例互斥锁（新实例要能立即拿到锁）
+            Program.ReleaseInstance();
+
+            bool started = true;
+            string failMsg = null;
             try
             {
                 var psi = new ProcessStartInfo(Application.ExecutablePath)
@@ -198,12 +209,30 @@ namespace WinTune
                     WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory,
                 };
                 Process.Start(psi);
-                Application.Exit();
             }
-            catch
+            catch (Exception ex)
             {
-                MessageBox.Show("已取消提权或提权失败。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                started = false;
+                failMsg = ex.Message;
             }
+
+            if (!started)
+            {
+                // 3. 用户取消 UAC 或启动失败：恢复互斥锁并回到前台
+                if (!Program.ReacquireInstance())
+                {
+                    // 期间已有人启动了别的实例，本实例退出
+                    Application.Exit();
+                    return;
+                }
+                if (frm != null) frm.Show();
+                MessageBox.Show("已取消提权或提权失败。\n\n" + failMsg, "提示",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // 4. 新实例已开始启动（会获得互斥锁），本实例退出
+            Application.Exit();
         }
     }
 

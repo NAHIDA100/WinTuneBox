@@ -24,6 +24,12 @@ namespace WinTune
                 SelfTest.Run();
                 return;
             }
+            // UI 离屏截图：--uitest（把 8 个页面渲染为 png 供开发者检查布局）
+            if (args != null && args.Length > 0 && args[0].IndexOf("uitest", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                SelfTest.UiDump();
+                return;
+            }
 
             bool mutexOk;
             using (var m = new Mutex(true, @"Local\WinTuneBox_SingleInstance", out mutexOk))
@@ -138,6 +144,50 @@ namespace WinTune
             try { System.IO.File.WriteAllText(outFile, sb.ToString(), Encoding.UTF8); } catch { }
             // 也尝试写入控制台
             try { Console.WriteLine(sb.ToString()); } catch { }
+        }
+
+        /// <summary>离屏渲染 8 个页面到 png（开发用：检查布局）</summary>
+        public static void UiDump()
+        {
+            string outDir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "uitest");
+            try { if (!System.IO.Directory.Exists(outDir)) System.IO.Directory.CreateDirectory(outDir); } catch { }
+            var pages = new UPage[] {
+                new PgOverview(), new PgOneKey(), new PgClean(), new PgStartup(),
+                new PgServices(), new PgNet(), new PgSoftware(), new PgTools(),
+            };
+            for (int i = 0; i < pages.Length; i++)
+            {
+                try
+                {
+                    using (var f = new Form())
+                    {
+                        f.Size = new System.Drawing.Size(C.S(1180), C.S(760));
+                        f.FormBorderStyle = FormBorderStyle.None;
+                        f.ShowInTaskbar = false;
+                        f.StartPosition = FormStartPosition.Manual;
+                        f.Location = new System.Drawing.Point(-10000, -10000); // 屏外
+                        pages[i].Dock = System.Windows.Forms.DockStyle.Fill;
+                        f.Controls.Add(pages[i]);
+                        f.Show();
+                        Application.DoEvents();
+                        pages[i].OnShown();
+                        Application.DoEvents();
+                        pages[i].Root.AutoScrollPosition = System.Drawing.Point.Empty;
+                        Application.DoEvents();
+                        using (var bmp = new System.Drawing.Bitmap(f.Width, f.Height))
+                        {
+                            pages[i].DrawToBitmap(bmp, new System.Drawing.Rectangle(0, 0, f.Width, f.Height));
+                            string file = System.IO.Path.Combine(outDir, string.Format("ui{0}.png", i));
+                            bmp.Save(file, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+                        f.Close();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    try { System.IO.File.WriteAllText(System.IO.Path.Combine(outDir, "err" + i + ".txt"), ex.ToString()); } catch { }
+                }
+            }
         }
     }
 }

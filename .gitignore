@@ -5,3 +5,4 @@ dist/_check.dll
 # 系统/编辑器杂项
 *.user
 Thumbs.db
+dist/uitest/

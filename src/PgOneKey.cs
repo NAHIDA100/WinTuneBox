@@ -43,7 +43,7 @@ namespace WinTune
             _hint.Font = C.F(9f);
             _hint.ForeColor = C.TextSub;
             _hint.Padding = new Padding(0, C.S(4), 0, C.S(8));
-            _hint.Text = "说明：状态列的 待优化/已优化/部分 是实时检测结果；“执行优化”对已优化项目会自动跳过。\r\n非管理员运行时，涉及 HKLM/服务 的项目会失败并提示，请点击窗口右上角“提权”。";
+            _hint.Text = "说明：状态列的 待优化/已优化/部分 是实时检测结果；“执行优化”对已优化项目会自动跳过。\r\n非管理员运行时，涉及 HKLM/服务 的项目会失败并提示，请点击界面左下角权限条“提权”。";
             top.Controls.Add(_hint);
             Root.Controls.Add(top);
 
@@ -121,7 +121,7 @@ namespace WinTune
         {
             if (!OS.IsElevated)
             {
-                MessageBox.Show(this, "建议以管理员身份运行以获得完整功能。\n请点击窗口右上角“以管理员身份重启”。",
+                MessageBox.Show(this, "建议以管理员身份运行以获得完整功能。\n请点击界面左下角权限条“以管理员身份重启”。",
                     "权限提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             var targets = new List<OneOp>();

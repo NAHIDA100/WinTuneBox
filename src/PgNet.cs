@@ -238,7 +238,7 @@ namespace WinTune
             else
             {
                 _hostsState.Text = "请先提权后再点“保存 hosts”。";
-                MessageBox.Show(this, "当前未提权，请点击窗口右上角“以管理员身份重启”后再保存。", "提示");
+                MessageBox.Show(this, "当前未提权，请点击界面左下角权限条“以管理员身份重启”后再保存。", "提示");
             }
         }
 

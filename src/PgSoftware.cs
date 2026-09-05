@@ -133,12 +133,47 @@ namespace WinTune
                 if (msiexec) args = "/x " + (c.IndexOf('{') >= 0 ? c.Substring(c.IndexOf('{')) : "");
                 var psi = new ProcessStartInfo { FileName = exe, Arguments = args, UseShellExecute = true };
                 Process.Start(psi);
-                MessageBox.Show(this, "已启动卸载程序，请按提示完成操作。", "卸载中", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(this, "已启动卸载程序，请按提示完成操作。\n本工具会在后台监测，卸载完成自动刷新列表。", "卸载中", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                WatchUninstall(s.Name);
             }
             catch (Exception ex)
             {
                 MessageBox.Show(this, "启动卸载失败：" + ex.Message, "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
+        }
+
+        /// <summary>后台轮询注册表，条目消失即视为卸载完成，自动刷新列表（最长监测约 90 秒）</summary>
+        void WatchUninstall(string softName)
+        {
+            string target = softName ?? "";
+            if (target.Length == 0) return;
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate
+            {
+                bool done = false;
+                for (int i = 0; i < 36; i++)
+                {
+                    System.Threading.Thread.Sleep(2500);
+                    if (IsDisposed) return;
+                    try
+                    {
+                        bool still = SoftMgr.ReadAll().Exists(x =>
+                            string.Equals(x.Name, target, StringComparison.OrdinalIgnoreCase));
+                        if (!still) { done = true; break; }
+                    }
+                    catch { }
+                }
+                C.On(this, delegate
+                {
+                    if (IsDisposed) return;
+                    LoadList();
+                    if (done)
+                        MessageBox.Show(this, "已检测到“" + target + "”卸载完成，列表已自动刷新。", "完成",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    else
+                        MessageBox.Show(this, "卸载可能尚未完成（或卸载器仍在运行）。列表已刷新，稍后可再点“刷新列表”。", "提示",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                });
+            });
         }
 
         void OpenLoc()

@@ -165,26 +165,44 @@ namespace WinTune
         // ── 修复类（后台，实时日志，可中止）──
         void RunRepair(string file, string args, string label)
         {
-            if (_proc != null && !_proc.HasExited)
+            try
             {
-                MessageBox.Show(this, "已有任务在运行，请先等待或点“中止当前任务”。", "提示");
-                return;
+                // 已释放的 Process 上求值 HasExited 会抛“没有与此对象关联的进程”，这里统一容错
+                if (_proc != null && !_proc.HasExited)
+                {
+                    MessageBox.Show(this, "已有任务在运行，请先等待或点“中止当前任务”。", "提示");
+                    return;
+                }
             }
+            catch { /* 旧进程对象已失效，允许启动新任务 */ }
+
             if (!OS.IsElevated)
             {
                 if (C.Ask(label + " 需要管理员权限。是否以管理员身份重启本工具？", "权限提示") != DialogResult.Yes) return;
                 FrmMain.ElevateSelf();
                 return;
             }
-            _proc = Runner.RunAsync(file, args, _log, label);
+            var np = Runner.RunAsync(file, args, _log, label, delegate { _proc = null; });
+            if (np != null) _proc = np;
         }
 
         void KillProc()
         {
-            if (_proc != null && !_proc.HasExited)
+            try
             {
-                try { _proc.Kill(); _log.Log("任务已被中止。", true); }
-                catch { }
+                if (_proc != null && !_proc.HasExited)
+                {
+                    _proc.Kill();
+                    _log.Log("已发出中止请求，正在终止…", true);
+                }
+                else
+                {
+                    _log.Log("当前没有正在运行的任务。");
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Log("中止失败（任务可能已结束）: " + ex.Message, true);
             }
         }
 

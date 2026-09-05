@@ -10,7 +10,7 @@ namespace WinTune
     // ═══ 主窗体：左侧导航 + 内容区 ═══
     public class FrmMain : Form
     {
-        public const string Ver = "1.0.4";
+        public const string Ver = "1.0.5";
         public const string AppName = "Windows 优化工具箱";
 
         const int SIDEBAR_W = 186;
@@ -54,15 +54,16 @@ namespace WinTune
             var sbBorder = new Panel { Dock = DockStyle.Left, Width = 1, BackColor = C.Border };
             sidebar.Controls.Add(sbBorder);
 
-            // 标题区
+            // 标题区（Padding 顶部过大曾导致大字纵向被裁，改为足够高度 + 合适内边距）
             var logo = new Label
             {
                 Text = AppName,
                 Font = C.F(14f, true),
                 ForeColor = C.TextMain,
                 Dock = DockStyle.Top,
-                Height = C.S(34),
-                Padding = new Padding(C.S(22), C.S(20), 0, 0),
+                Height = C.S(46),
+                Padding = new Padding(C.S(22), C.S(12), C.S(6), 0),
+                AutoEllipsis = true,
             };
             var logoSub = new Label
             {

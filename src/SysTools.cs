@@ -38,8 +38,10 @@ namespace WinTune
             catch (Exception ex) { return ex.Message; }
         }
 
-        /// <summary>异步运行并把输出逐行送到 log（admin 工具用）</summary>
-        public static Process RunAsync(string file, string args, LogBox log, string label)
+        /// <summary>异步运行并把输出逐行送到 log（admin 工具用）。
+        /// onDone：进程真正结束后回调（先于内部清理执行），用于调用方清空自己的 Process 引用，
+        /// 避免对已释放对象求值 HasExited 抛出“没有与此对象关联的进程”。</summary>
+        public static Process RunAsync(string file, string args, LogBox log, string label, Action onDone)
         {
             var psi = new ProcessStartInfo(file, args)
             {
@@ -55,15 +57,23 @@ namespace WinTune
                 var p = new Process { StartInfo = psi, EnableRaisingEvents = true };
                 p.OutputDataReceived += (s, e) =>
                 {
-                    if (!string.IsNullOrEmpty(e.Data)) log.Log(e.Data, e.Data.IndexOf("错误", StringComparison.Ordinal) >= 0);
+                    try { if (!string.IsNullOrEmpty(e.Data)) log.Log(e.Data, e.Data.IndexOf("错误", StringComparison.Ordinal) >= 0); }
+                    catch { }
                 };
                 p.ErrorDataReceived += (s, e) =>
                 {
-                    if (!string.IsNullOrEmpty(e.Data)) log.Log(e.Data, true);
+                    try { if (!string.IsNullOrEmpty(e.Data)) log.Log(e.Data, true); }
+                    catch { }
                 };
                 p.Exited += (s, e) =>
                 {
-                    log.Log(string.Format("[{0}] 结束，退出码 {1}", label, p.ExitCode));
+                    try
+                    {
+                        int code = p.ExitCode;    // 在 Dispose 前读取
+                        log.Log(string.Format("[{0}] 结束，退出码 {1}", label, code));
+                    }
+                    catch { }
+                    try { if (onDone != null) onDone(); } catch { }
                     try { p.Dispose(); } catch { }
                 };
                 if (!p.Start()) { log.Log(label + " 启动失败", true); return null; }
@@ -203,49 +213,79 @@ namespace WinTune
         }
 
         // ── 电源计划 ──
+        const string GUID_ULTIMATE = "e9c42d02-d5df-432d-9ed0-0f53b3d0b34e"; // 卓越性能(隐藏)
+
+        /// <summary>切换电源计划。策略：先复用系统中已有的同名计划（避免反复复制出无数个“高性能”），
+        /// 找不到才新建；卓越性能为隐藏计划直接激活其固定 GUID，失败再回退 SCHEME_MAX 复制。</summary>
         public static string SwitchPowerScheme(string targetName)
         {
-            // targetName: 高性能 / 卓越性能
+            // targetName: 节能 / 平衡 / 高性能 / 卓越性能
+            if (!OS.IsElevated)
+                return "切换电源计划需要管理员权限。\n请先提权（概览页或左下角权限条），再试一次。";
+
             string curGuid, curName;
             OS.ActivePowerScheme(out curGuid, out curName);
             if (curName != null && curName.IndexOf(targetName, StringComparison.OrdinalIgnoreCase) >= 0)
-                return "当前已是“" + curName + "”";
+                return "当前已是“" + curName + "”，无需切换";
 
-            if (targetName == "卓越性能" && !OS.IsWin10Plus)
-                return "卓越性能仅 Windows 10/11 可用，已为你切换高性能";
-            string alias = targetName == "卓越性能" ? "SCHEME_MAX" : "SCHEME_MIN";
-            string outp = Runner.Run("powercfg.exe", "/duplicatescheme " + alias, 20000);
-            if (outp != null && outp.IndexOf("0x") >= 0 && outp.IndexOf("0x") < 30 && outp.Length < 40)
-                outp = Runner.Run("powercfg.exe", "/duplicatescheme " + alias, 20000); // 重试避免误判
-            // 从输出解析 GUID
-            string guid = null;
-            if (outp != null)
+            // 1) 卓越性能：隐藏计划，尝试直接激活固定 GUID
+            if (targetName == "卓越性能")
             {
-                int p1 = outp.IndexOf('{');
-                int p2 = outp.IndexOf('}', p1 + 1);
-                if (p1 >= 0 && p2 > p1) guid = outp.Substring(p1, p2 - p1 + 1);
-            }
-            if (string.IsNullOrEmpty(guid))
-            {
-                // duplicatescheme 失败（如卓越性能别名不支持）→ 列出后按名称找
-                string list = Runner.Run("powercfg.exe", "/list", 15000);
-                if (list != null)
+                if (!OS.IsWin10Plus) return "卓越性能仅 Windows 10/11 提供，已为你改用“高性能”路径";
+                string r0 = Runner.Run("powercfg.exe", "/setactive " + GUID_ULTIMATE, 10000);
+                if (r0 == null) return null;   // 系统存在该隐藏计划，已切换成功
+                // 回退：复制隐藏计划再激活
+                string dup0 = Runner.Run("powercfg.exe", "/duplicatescheme " + GUID_ULTIMATE, 15000);
+                string g0 = ExtractGuid(dup0);
+                if (!string.IsNullOrEmpty(g0))
                 {
-                    foreach (string line in list.Split('\n'))
+                    string r1 = Runner.Run("powercfg.exe", "/setactive " + g0, 10000);
+                    if (r1 == null) return null;
+                }
+                return "未能启用“卓越性能”：\n" + (dup0 ?? r0);
+            }
+
+            // 2) 常规计划：先按名称复用现有计划
+            string list = Runner.Run("powercfg.exe", "/list", 15000);
+            if (list != null)
+            {
+                foreach (string line in list.Split('\n'))
+                {
+                    if (line.IndexOf(targetName, StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        if (line.IndexOf(targetName, StringComparison.OrdinalIgnoreCase) >= 0)
+                        string guid = ExtractGuid(line);
+                        if (!string.IsNullOrEmpty(guid))
                         {
-                            int p1 = line.IndexOf('{');
-                            int p2 = line.IndexOf('}', p1 + 1);
-                            if (p1 >= 0 && p2 > p1) { guid = line.Substring(p1, p2 - p1 + 1); break; }
+                            string r = Runner.Run("powercfg.exe", "/setactive " + guid, 10000);
+                            if (r == null) return null;
+                            return "切换失败: " + r;
                         }
                     }
                 }
             }
-            if (string.IsNullOrEmpty(guid))
-                return "未能找到/创建“" + targetName + "”电源计划:\n" + outp;
-            string r = Runner.Run("powercfg.exe", "/setactive " + guid, 10000);
-            return r == null ? null : "切换失败: " + r;
+
+            // 3) 系统确实没有 → 用别名复制一个再激活
+            string alias = "SCHEME_BALANCED";
+            if (targetName == "高性能") alias = "SCHEME_MIN";
+            if (targetName == "节能") alias = "SCHEME_SAVER";
+            string outp = Runner.Run("powercfg.exe", "/duplicatescheme " + alias, 20000);
+            string g = ExtractGuid(outp);
+            if (!string.IsNullOrEmpty(g))
+            {
+                string r2 = Runner.Run("powercfg.exe", "/setactive " + g, 10000);
+                if (r2 == null) return null;
+                return "切换失败: " + r2;
+            }
+            return "未能找到/创建“" + targetName + "”电源计划：\n" + outp;
+        }
+
+        static string ExtractGuid(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return null;
+            int p1 = text.IndexOf('{');
+            int p2 = text.IndexOf('}', p1 + 1);
+            if (p1 >= 0 && p2 > p1) return text.Substring(p1, p2 - p1 + 1);
+            return null;
         }
 
         // ── 安全模式 ──

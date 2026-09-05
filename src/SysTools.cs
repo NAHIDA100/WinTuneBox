@@ -234,7 +234,7 @@ namespace WinTune
                 if (!OS.IsWin10Plus) return "卓越性能仅 Windows 10/11 提供，已为你改用“高性能”路径";
                 string r0 = Runner.Run("powercfg.exe", "/setactive " + GUID_ULTIMATE, 10000);
                 if (r0 == null) return null;   // 系统存在该隐藏计划，已切换成功
-                // 回退：复制隐藏计划再激活
+                // 回退 1：复制隐藏计划再激活
                 string dup0 = Runner.Run("powercfg.exe", "/duplicatescheme " + GUID_ULTIMATE, 15000);
                 string g0 = ExtractGuid(dup0);
                 if (!string.IsNullOrEmpty(g0))
@@ -242,7 +242,34 @@ namespace WinTune
                     string r1 = Runner.Run("powercfg.exe", "/setactive " + g0, 10000);
                     if (r1 == null) return null;
                 }
-                return "未能启用“卓越性能”：\n" + (dup0 ?? r0);
+                // 回退 2：Win11 24H2/25H2 已移除隐藏“卓越性能”方案（setactive 报“参数无效/退出码 1”），
+                // 此时复制现有“高性能”并命名为“卓越性能-增强”顶上
+                string listP = Runner.Run("powercfg.exe", "/list", 15000);
+                string srcGuid = null;
+                if (listP != null)
+                {
+                    foreach (string line in listP.Split('\n'))
+                    {
+                        if (line.IndexOf("高性能", StringComparison.Ordinal) >= 0)
+                        {
+                            srcGuid = ExtractGuid(line);
+                            if (!string.IsNullOrEmpty(srcGuid)) break;
+                        }
+                    }
+                }
+                if (!string.IsNullOrEmpty(srcGuid))
+                {
+                    string dup2 = Runner.Run("powercfg.exe", "/duplicatescheme " + srcGuid, 15000);
+                    string g2 = ExtractGuid(dup2);
+                    if (!string.IsNullOrEmpty(g2))
+                    {
+                        Runner.Run("powercfg.exe", "/changename " + g2 + " 卓越性能-增强", 10000);
+                        string r2 = Runner.Run("powercfg.exe", "/setactive " + g2, 10000);
+                        if (r2 == null)
+                            return "OK:当前 Windows 版本已不再内置“卓越性能”隐藏方案，已自动复制“高性能”为「卓越性能-增强」并启用（设置取向与高性能一致）。";
+                    }
+                }
+                return "未能启用“卓越性能”（当前 Windows 版本未提供该隐藏方案，自动创建替代也失败）：\n" + (dup0 ?? r0);
             }
 
             // 2) 常规计划：先按名称复用现有计划

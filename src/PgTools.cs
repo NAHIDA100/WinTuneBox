@@ -252,8 +252,13 @@ namespace WinTune
                 string err = SysTools.SwitchPowerScheme(name);
                 C.On(this, delegate
                 {
-                    if (err == null) MessageBox.Show(this, "已切换电源计划：" + name, "完成");
-                    else MessageBox.Show(this, err, "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    bool okAsFallback = err != null && err.StartsWith("OK:");
+                    string msg = okAsFallback ? err.Substring(3) : err;
+                    if (err == null || okAsFallback)
+                        MessageBox.Show(this, (err == null ? "已切换电源计划：" + name : msg), "完成",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    else
+                        MessageBox.Show(this, err, "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     UpdatePower();
                 });
             });

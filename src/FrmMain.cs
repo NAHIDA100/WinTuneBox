@@ -10,7 +10,7 @@ namespace WinTune
     // ═══ 主窗体：左侧导航 + 内容区 ═══
     public class FrmMain : Form
     {
-        public const string Ver = "1.0.6";
+        public const string Ver = "1.0.7";
         public const string AppName = "Windows 优化工具箱";
 
         const int SIDEBAR_W = 186;
@@ -27,6 +27,7 @@ namespace WinTune
         bool _trayOptBusy;
         DateTime _lastTrayLeft = DateTime.MinValue;
         bool _trayPendingClick;                    // 单击防抖：350ms 内第二次单击视为双击
+        FloatBall _ball;                           // 加速悬浮球
         uint _taskbarMsg;                          // TaskbarCreated：Explorer 重启后需重注册托盘图标
 
         [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
@@ -151,6 +152,7 @@ namespace WinTune
             _pages = pages;
             _ov.GotoPage = Go;
             _ov.TrayToggle = TraySet;
+            _ov.FloatToggle = FloatBallSet;
             foreach (var p in _pages)
             {
                 p.Visible = false;
@@ -169,15 +171,56 @@ namespace WinTune
                         "权限提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
             };
 
-            // 若上次启用了托盘常驻，本次自动恢复
+            // 若上次启用了托盘/悬浮球常驻，本次自动恢复
             try
             {
                 int? v = Regs.Dword(RegistryHive.CurrentUser, RegistryView.Default,
                     PgOverview.TrayRegKey, "TrayIcon");
                 if (v != null && v.Value == 1) TraySet(true);
+                int? b = Regs.Dword(RegistryHive.CurrentUser, RegistryView.Default,
+                    PgOverview.TrayRegKey, "FloatBall");
+                if (b != null && b.Value == 1) FloatBallSet(true);
             }
             catch { }
-            FormClosed += delegate { DisposeTray(); };
+            FormClosed += delegate { DisposeTray(); DisposeBall(); };
+        }
+
+        // ═══ 加速悬浮球开关 ═══
+        void FloatBallSet(bool on)
+        {
+            if (on)
+            {
+                if (_ball != null) return;
+                _ball = new FloatBall();
+                _ball.OnOpenMain = ShowMain;
+                _ball.OnReport = delegate(string s) { if (_ov != null) _ov.SetMemResultText(s); };
+                _ball.OnBallClosed = delegate
+                {
+                    try
+                    {
+                        Regs.DelVal(RegistryHive.CurrentUser, RegistryView.Default,
+                            PgOverview.TrayRegKey, "FloatBall");
+                    }
+                    catch { }
+                    _ball = null;
+                    if (_ov != null) _ov.SyncBallCheck(false);
+                };
+                _ball.Show();
+                try { _ball.Activate(); } catch { }
+            }
+            else
+            {
+                DisposeBall();
+            }
+        }
+
+        void DisposeBall()
+        {
+            if (_ball != null)
+            {
+                try { _ball.CloseBall(); } catch { }
+                _ball = null;
+            }
         }
 
         // ═══ 托盘常驻：单击=内存优化，双击=打开主界面，右键=菜单 ═══

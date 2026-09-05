@@ -12,6 +12,7 @@ namespace WinTune
     {
         public Action<int> GotoPage;
         public Action<bool> TrayToggle;            // 由主窗体注入：开关托盘常驻
+        public Action<bool> FloatToggle;           // 由主窗体注入：开关加速悬浮球
         readonly Timer _timer = new Timer { Interval = 2000 };
         readonly Label _cpuTxt = new Label(), _ramTxt = new Label(), _diskTxt = new Label();
         readonly MBar _cpuBar = new MBar(), _ramBar = new MBar { Fill = C.Green }, _diskBar = new MBar { Fill = C.Orange };
@@ -20,6 +21,7 @@ namespace WinTune
         readonly Label _memResult = new Label();
         readonly CheckBox _chkTray = new CheckBox();
         readonly CheckBox _chkPin = new CheckBox();
+        readonly CheckBox _chkBall = new CheckBox();
         static readonly ToolTip _tipBox = new ToolTip();
         FlatBtn _btnMem;
         bool _memBusy;
@@ -230,8 +232,42 @@ namespace WinTune
             row3.Controls.Add(pinBtn);
             cm.Controls.Add(row3);
 
-            CardNote(cm, "优化原理与 PCL 启动器一致：清空各进程的工作集内存，系统会把这些页面转为可用内存。程序重新读写时会自然恢复，属正常现象。\n说明：“固定显示”会同时展开系统其他被隐藏的托盘图标（Win10/7 有效）；Win11 请到 设置→个性化→任务栏→任务栏角落图标 中把本程序设为“显示”，或将图标从 ^ 折叠区拖出一次即可固定。");
+            // 加速悬浮球
+            var row4 = new Panel { Dock = DockStyle.Top, Height = C.S(30) };
+            _chkBall.Text = "启用加速悬浮球（闲置自动贴边隐藏并半透明；拖动移动，单击=内存优化，双击=打开工具箱）";
+            _chkBall.Font = C.F(9f);
+            _chkBall.AutoSize = true;
+            _chkBall.ForeColor = C.TextMain;
+            _chkBall.Location = new Point(0, C.S(2));
+            try
+            {
+                int? v = Regs.Dword(RegistryHive.CurrentUser, RegistryView.Default, TrayRegKey, "FloatBall");
+                _chkBall.Checked = v != null && v.Value == 1;
+            }
+            catch { }
+            _chkBall.CheckedChanged += delegate
+            {
+                try
+                {
+                    if (_chkBall.Checked)
+                        Regs.SetDword(RegistryHive.CurrentUser, RegistryView.Default, TrayRegKey, "FloatBall", 1);
+                    else
+                        Regs.DelVal(RegistryHive.CurrentUser, RegistryView.Default, TrayRegKey, "FloatBall");
+                }
+                catch { }
+                if (FloatToggle != null) FloatToggle(_chkBall.Checked);
+            };
+            row4.Controls.Add(_chkBall);
+            cm.Controls.Add(row4);
+
+            CardNote(cm, "优化原理与 PCL 启动器一致：清空各进程的工作集内存，系统会把这些页面转为可用内存。程序重新读写时会自然恢复，属正常现象。\n说明：“固定显示”会同时展开系统其他被隐藏的托盘图标（Win10/7 有效）；Win11 请到 设置→个性化→任务栏→任务栏角落图标 中把本程序设为“显示”，或将图标从 ^ 折叠区拖出一次即可固定。悬浮球常驻内存占用极小（空闲仅 500ms 低频监测，动画仅在滑入滑出时运行）。");
             return cm;
+        }
+
+        /// <summary>悬浮球被右键“关闭”时同步勾选状态（由主窗体回调）</summary>
+        public void SyncBallCheck(bool on)
+        {
+            C.On(this, delegate { if (!_chkBall.IsDisposed) _chkBall.Checked = on; });
         }
 
         /// <summary>执行一次内存优化（后台线程，完成后更新结果标签）。fromTray 来自托盘时顺带弹气泡交给主窗体处理。</summary>

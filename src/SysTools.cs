@@ -133,22 +133,27 @@ namespace WinTune
         [DllImport("kernel32.dll")]
         static extern bool CloseHandle(IntPtr h);
 
+        /// <summary>一轮工作集清理：逐进程 EmptyWorkingSet，校验返回；返回真正清理成功的进程数。</summary>
         public static int CleanAllMemory()
         {
-            int n = 0;
+            int ok = 0;
             try
             {
                 foreach (Process p in Process.GetProcesses())
                 {
                     try
                     {
-                        IntPtr h = OpenProcess(0x0400 | 0x0008, false, p.Id); // PROCESS_QUERY_LIMITED_INFORMATION|QUERY
-                        if (h == IntPtr.Zero) h = OpenProcess(0x1F0FFF, false, p.Id);
+                        IntPtr h = OpenProcess(0x1F0FFF /*PROCESS_ALL_ACCESS*/, false, p.Id);
+                        if (h == IntPtr.Zero)
+                            h = OpenProcess(0x0400 | 0x0008 /*QUERY|QUERY_LIMITED*/, false, p.Id);
                         if (h != IntPtr.Zero)
                         {
-                            EmptyWorkingSet(h);
-                            CloseHandle(h);
-                            n++;
+                            try
+                            {
+                                // EmptyWorkingSet 需 PROCESS_SET_QUOTA，只有限查询句柄会失败 → 校验返回值避免虚报
+                                if (EmptyWorkingSet(h) != 0) ok++;
+                            }
+                            finally { CloseHandle(h); }
                         }
                     }
                     catch { }
@@ -156,7 +161,7 @@ namespace WinTune
                 }
             }
             catch { }
-            return n;
+            return ok;
         }
 
         /// <summary>当前可用物理内存（MB）</summary>
@@ -167,25 +172,34 @@ namespace WinTune
         }
 
         /// <summary>
-        /// 一次完整的“内存优化”（PCL 风格）：整理全部进程工作集，
-        /// 等待系统回收后对比可用内存变化。返回描述文本，如
-        /// “整理 240 个进程 · 可用内存增加 1.2 GB（8.1 → 9.3 GB）”。
-        /// 注意：耗时约 1.5 秒，请在后台线程调用。
+        /// 一次完整的“内存优化”（PCL 风格，效果对齐）：
+        /// 三轮整理全部进程工作集（覆盖更多可让出页）→ 等待脏页写回（writeback 完成后
+        /// 才真正计入可用内存）→ 对比前后可用内存得到本次清理量。
+        /// 管理员身份下可清理 SYSTEM/服务进程，效果显著更好。
+        /// 注意：请在后台线程调用。
         /// </summary>
         public static string OptimizeMemoryNow()
         {
             long before = AvailableMB();
-            int n = CleanAllMemory();
-            // 给系统一点时间把换出页面并入空闲列表
-            System.Threading.Thread.Sleep(1400);
+            int n = 0;
+            for (int round = 0; round < 3; round++)
+            {
+                n += CleanAllMemory();
+                if (round < 2) System.Threading.Thread.Sleep(150);
+            }
+            // 等待被换出的脏页写回磁盘（写回完成才计入可用内存）
+            System.Threading.Thread.Sleep(1800);
             long after = AvailableMB();
             long freedMb = after - before;
             if (freedMb < 0) freedMb = 0;
-            return string.Format("整理 {0} 个进程 · 可用内存增加 {1}（{2} → {3} GB）",
+            string report = string.Format("整理 {0} 进程次 · 可用内存增加 {1}（{2} → {3} GB）",
                 n,
                 freedMb >= 1024 ? (freedMb / 1024.0).ToString("F2") + " GB" : freedMb + " MB",
                 (before / 1024.0).ToString("F2"),
                 (after / 1024.0).ToString("F2"));
+            if (!OS.IsElevated)
+                report += "\n（当前未提权：系统进程无法整理；以管理员身份运行后效果更佳）";
+            return report;
         }
 
         // ── 电源计划 ──

@@ -33,6 +33,12 @@ namespace WinTune
                 SelfTest.UiDump();
                 return;
             }
+            // 内存优化实测：--memprobe（跑一次并写 selftest-mem.txt，验证清理量）
+            if (args != null && args.Length > 0 && args[0].IndexOf("memprobe", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                SelfTest.RunMemProbe();
+                return;
+            }
 
             bool mutexOk;
             _instanceMutex = new Mutex(true, MutexName, out mutexOk);
@@ -168,6 +174,25 @@ namespace WinTune
             try { System.IO.File.WriteAllText(outFile, sb.ToString(), Encoding.UTF8); } catch { }
             // 也尝试写入控制台
             try { Console.WriteLine(sb.ToString()); } catch { }
+        }
+
+        /// <summary>内存优化实测：跑一次优化并输出报告文件</summary>
+        public static void RunMemProbe()
+        {
+            string outFile = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "selftest-mem.txt");
+            try
+            {
+                long before = SysTools.AvailableMB();
+                string report = SysTools.OptimizeMemoryNow();
+                long after = SysTools.AvailableMB();
+                string txt = string.Format("优化前可用: {0} MB\r\n{1}\r\n优化后可用: {2} MB",
+                    before, report, after);
+                System.IO.File.WriteAllText(outFile, txt, Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                try { System.IO.File.WriteAllText(outFile, "异常: " + ex, Encoding.UTF8); } catch { }
+            }
         }
 
         /// <summary>离屏渲染 8 个页面到 png（开发用：检查布局）</summary>

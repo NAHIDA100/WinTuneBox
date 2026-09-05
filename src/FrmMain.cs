@@ -10,7 +10,7 @@ namespace WinTune
     // ═══ 主窗体：左侧导航 + 内容区 ═══
     public class FrmMain : Form
     {
-        public const string Ver = "1.0.3";
+        public const string Ver = "1.0.4";
         public const string AppName = "Windows 优化工具箱";
 
         const int SIDEBAR_W = 186;
@@ -27,6 +27,10 @@ namespace WinTune
         bool _trayOptBusy;
         DateTime _lastTrayLeft = DateTime.MinValue;
         bool _trayPendingClick;                    // 单击防抖：350ms 内第二次单击视为双击
+        uint _taskbarMsg;                          // TaskbarCreated：Explorer 重启后需重注册托盘图标
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        static extern uint RegisterWindowMessageW(string lpString);
 
         public FrmMain()
         {
@@ -181,6 +185,8 @@ namespace WinTune
             if (on)
             {
                 if (_tray != null) return;
+                if (_taskbarMsg == 0)
+                    _taskbarMsg = RegisterWindowMessageW("TaskbarCreated");  // Explorer 重启恢复托盘
                 _tray = new NotifyIcon();
                 try { _tray.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); }
                 catch { _tray.Icon = SystemIcons.Application; }
@@ -189,12 +195,28 @@ namespace WinTune
                 _tray.MouseClick += TrayMouseClick;
                 _tray.MouseDoubleClick += TrayMouseDoubleClick;
                 _tray.ContextMenuStrip = TrayMenu();
-                _tray.ShowBalloonTip(1800, "Windows 优化工具箱", "已常驻通知区域：\n左键单击 = 立即执行一次内存优化\n双击 = 打开工具箱", ToolTipIcon.Info);
+                _tray.ShowBalloonTip(2500, "Windows 优化工具箱",
+                    "已常驻通知区域：左键单击 = 内存优化，双击 = 打开工具箱。\n若图标被折叠，请把它从 ^ 区拖出一次即可固定；Win11 也可在 设置→个性化→任务栏→任务栏角落图标 中设为显示。",
+                    ToolTipIcon.Info);
             }
             else
             {
                 DisposeTray();
             }
+        }
+
+        /// <summary>收到 TaskbarCreated（资源管理器重启/崩溃恢复）→ 重新注册托盘图标</summary>
+        protected override void WndProc(ref Message m)
+        {
+            if (_taskbarMsg != 0 && m.Msg == (int)_taskbarMsg)
+            {
+                var n = _tray;
+                if (n != null)
+                {
+                    try { n.Visible = false; n.Visible = true; } catch { }
+                }
+            }
+            base.WndProc(ref m);
         }
 
         void DisposeTray()

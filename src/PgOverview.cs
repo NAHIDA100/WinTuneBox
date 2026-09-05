@@ -20,6 +20,7 @@ namespace WinTune
         readonly Label _memResult = new Label();
         readonly CheckBox _chkTray = new CheckBox();
         readonly CheckBox _chkPin = new CheckBox();
+        static readonly ToolTip _tipBox = new ToolTip();
         FlatBtn _btnMem;
         bool _memBusy;
         bool _built;
@@ -219,6 +220,13 @@ namespace WinTune
                         "重启资源管理器", true) != DialogResult.Yes) return;
                 SysTools.RestartExplorer();
             };
+            // Win11 无 EnableAutoTray 总开关：置灰并引导手动设置
+            bool pinOk = !OS.IsWin11;
+            _chkPin.Enabled = pinOk;
+            pinBtn.Enabled = pinOk;
+            _chkPin.ForeColor = pinOk ? C.TextMain : C.TextDim;
+            if (!pinOk)
+                _tipBox.SetToolTip(_chkPin, "Win11 请使用：设置 → 个性化 → 任务栏 → 任务栏角落图标，把本程序设为“显示”，或将图标拖出 ^ 折叠区一次");
             row3.Controls.Add(pinBtn);
             cm.Controls.Add(row3);
 

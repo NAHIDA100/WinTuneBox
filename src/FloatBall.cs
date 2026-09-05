@@ -378,5 +378,17 @@ namespace WinTune
         }
 
         public bool AutoHideEnabled { get { return _autoHide; } }
+
+        /// <summary>屏幕环境变化后把球拉回当前屏幕（贴边的滑出，自由的收回工作区）</summary>
+        public void SnapInside()
+        {
+            if (_dragging || _st == St.Moving) return;
+            try
+            {
+                if (_st == St.Docked) Undock();
+                else ClampInside();
+            }
+            catch { }
+        }
     }
 }

@@ -233,6 +233,8 @@ namespace WinTune
         {
             base.OnLayout(levent);
             if (_fitting) return;
+            // 窗口在全屏切换/最小化等异常尺寸下不重算高度，防止把坏高度缓存下来
+            if (ClientSize.Width < C.S(220)) return;
             _fitting = true;
             try
             {

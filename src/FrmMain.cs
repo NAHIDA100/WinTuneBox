@@ -10,7 +10,7 @@ namespace WinTune
     // ═══ 主窗体：左侧导航 + 内容区 ═══
     public class FrmMain : Form
     {
-        public const string Ver = "1.0.7";
+        public const string Ver = "1.0.8";
         public const string AppName = "Windows 优化工具箱";
 
         const int SIDEBAR_W = 186;
@@ -21,6 +21,7 @@ namespace WinTune
         readonly Label _perm = new Label();
         int _cur = -1;
         PgOverview _ov;
+        readonly Timer _relay = new Timer { Interval = 260 };   // Resize/显示变化后延迟整页重排
 
         // ── 托盘常驻（内存优化，PCL 风格）──
         NotifyIcon _tray;
@@ -182,7 +183,44 @@ namespace WinTune
                 if (b != null && b.Value == 1) FloatBallSet(true);
             }
             catch { }
-            FormClosed += delegate { DisposeTray(); DisposeBall(); };
+            FormClosed += delegate
+            {
+                DisposeTray();
+                DisposeBall();
+                try { _relay.Stop(); _relay.Dispose(); } catch { }
+            };
+
+            // 尺寸/显示环境变化 → 延迟整页强制重排（修复全屏切换/还原后布局不恢复的问题）
+            _relay.Tick += delegate
+            {
+                _relay.Stop();
+                RelayoutPages();
+            };
+            Resize += delegate
+            {
+                if (Width > 0 && Height > 0 && Visible) _relay.Start();
+            };
+        }
+
+        /// <summary>强制所有页面重新布局（卡片 AutoFit 按当前宽度重算高度）</summary>
+        void RelayoutPages()
+        {
+            if (_pages == null) return;
+            foreach (var p in _pages)
+            {
+                if (p == null || p.IsDisposed) continue;
+                try
+                {
+                    p.SuspendLayout();
+                    p.Root.SuspendLayout();
+                    p.Root.ResumeLayout(true);
+                    p.ResumeLayout(true);
+                    p.PerformLayout();
+                    p.Invalidate(true);
+                }
+                catch { }
+            }
+            try { Invalidate(true); } catch { }
         }
 
         // ═══ 加速悬浮球开关 ═══
@@ -249,7 +287,8 @@ namespace WinTune
             }
         }
 
-        /// <summary>收到 TaskbarCreated（资源管理器重启/崩溃恢复）→ 重新注册托盘图标</summary>
+        /// <summary>收到 TaskbarCreated（资源管理器重启/崩溃恢复）→ 重新注册托盘图标；
+        /// WM_DISPLAYCHANGE（分辨率/全屏切换）→ 整页重排并把悬浮球拉回屏幕内</summary>
         protected override void WndProc(ref Message m)
         {
             if (_taskbarMsg != 0 && m.Msg == (int)_taskbarMsg)
@@ -259,6 +298,15 @@ namespace WinTune
                 {
                     try { n.Visible = false; n.Visible = true; } catch { }
                 }
+            }
+            else if (m.Msg == 0x007E /*WM_DISPLAYCHANGE*/)
+            {
+                var b = _ball;
+                if (b != null)
+                {
+                    try { b.SnapInside(); } catch { }
+                }
+                _relay.Start();
             }
             base.WndProc(ref m);
         }
@@ -373,11 +421,14 @@ namespace WinTune
                 _nav[_cur].Active = false;
             }
             _cur = idx;
-            _pages[idx].Visible = true;
-            _pages[idx].BringToFront();
+            var page = _pages[idx];
+            page.Visible = true;
+            page.BringToFront();
             _nav[idx].Active = true;
             UpdatePerm();
-            _pages[idx].OnShown();
+            try { page.Root.AutoScrollPosition = new Point(0, 0); } catch { }  // 切页回顶部
+            page.PerformLayout();
+            page.OnShown();
         }
 
         /// <summary>以管理员身份重启自身。

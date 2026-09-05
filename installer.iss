@@ -1,7 +1,7 @@
 ﻿; ═══ Windows 优化工具箱 安装脚本 ═══
 ; 需要: Inno Setup 6 + Languages\ChineseSimplified.isl（本机已就绪）
 #define AppName "Windows 优化工具箱"
-#define AppVer "1.0.7"
+#define AppVer "1.0.8"
 #define ExeName "WinOptimizer.exe"
 
 [Setup]

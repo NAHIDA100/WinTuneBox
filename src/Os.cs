@@ -166,6 +166,7 @@ namespace WinTune
 
         // ── 注册表静态信息 ──
         public static string ProductName, EditionId, ReleaseName, ArchName, CpuName, GpuName;
+        public static string GpuAll;        // 全部显示适配器（调试/报告用）
         public static string WinVerFull;   // 例: Windows 11 专业版 24H2 (Build 26100.…)
         public static int CpuCores;        // 逻辑处理器数
         public static DateTime InstallDate;
@@ -213,9 +214,12 @@ namespace WinTune
             }
             catch { }
             CpuCores = Environment.ProcessorCount;
+            // 显卡：枚举全部显示适配器，跳过虚拟/远程类，按物理厂商优先级选主卡
+            // （MuMu 等模拟器虚拟显卡常排 0000，不能直接取第一个）
             try
             {
-                for (int i = 0; i < 12; i++)
+                var gpus = new System.Collections.Generic.List<string>();
+                for (int i = 0; i < 16; i++)
                 {
                     using (var k = Registry.LocalMachine.OpenSubKey(
                         @"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\" + i.ToString("D4")))
@@ -224,8 +228,45 @@ namespace WinTune
                         string desc = ReadStr(k, "DriverDesc");
                         string vid = ReadStr(k, "ProviderName");
                         if (!string.IsNullOrEmpty(desc) && !string.IsNullOrEmpty(vid))
-                        { GpuName = desc + " (" + vid + ")"; break; }
+                            gpus.Add(desc + " (" + vid + ")");
                     }
+                }
+                GpuAll = string.Join("  |  ", gpus.ToArray());
+                if (gpus.Count > 0)
+                {
+                    // 虚拟/远程/捕获类适配器关键词
+                    string[] virtualKeys = {
+                        "virtual", "mumu", "mu mu", "模拟", "remote", "rdp", "indirect",
+                        "mirror", "basic display", "基本显示", "vmware svga", "vbox",
+                        "virtualbox", "hyper-v", "qxl", "qemu", "parsec", "citrix",
+                        "mirror driver", "msmirror", "venview", "spacedesk", "duet display",
+                        "vga display", "microsoft basic", "vda", "radmin", "ultravnc", "anydesk", "parsec",
+                    };
+                    Func<string, int> RealRank = delegate(string s)
+                    {
+                        string t = s.ToLower();
+                        if (t.IndexOf("nvidia") >= 0 || t.IndexOf("geforce") >= 0 || t.IndexOf("quadro") >= 0 ||
+                            t.IndexOf("rtx") >= 0 || t.IndexOf("gtx") >= 0) return 1;
+                        if (t.IndexOf("radeon") >= 0 || t.IndexOf("amd") >= 0 || t.IndexOf("ati") >= 0) return 2;
+                        if (t.IndexOf("intel") >= 0 || t.IndexOf("arc") >= 0 || t.IndexOf("iris") >= 0 ||
+                            t.IndexOf("uhd") >= 0) return 3;
+                        return 9;
+                    };
+                    Func<string, bool> IsVirtual = delegate(string s)
+                    {
+                        string t = s.ToLower();
+                        foreach (string v in virtualKeys) if (t.IndexOf(v) >= 0) return true;
+                        return false;
+                    };
+                    int best = 0;
+                    string bestName = gpus[0];
+                    for (int j = 0; j < gpus.Count; j++)
+                    {
+                        if (IsVirtual(gpus[j])) continue;
+                        int r = RealRank(gpus[j]);
+                        if (r < best || best == 0) { best = r; bestName = gpus[j]; }
+                    }
+                    GpuName = best == 0 ? gpus[0] : bestName;
                 }
             }
             catch { }

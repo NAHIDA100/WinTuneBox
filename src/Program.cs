@@ -109,7 +109,9 @@ namespace WinTune
                 ulong f, t;
                 if (OS.DiskInfo(OS.SystemDrive, out f, out t))
                     line("系统盘: 总 " + C.Bytes((long)t) + " 可用 " + C.Bytes((long)f));
-                line("显卡: " + OS.GpuName);
+                line("显卡(首选): " + OS.GpuName);
+                if (!string.IsNullOrEmpty(OS.GpuAll) && OS.GpuAll != OS.GpuName)
+                    line("显卡(全部): " + OS.GpuAll);
                 line("开机时间: " + OS.BootTime);
 
                 line("── 一键优化项检测 ──");

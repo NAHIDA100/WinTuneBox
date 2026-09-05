@@ -82,6 +82,7 @@ namespace WinTune
 
             _hostsBox.Font = C.Mono(9f);
             _hostsBox.Multiline = true;
+            _hostsBox.AutoSize = false;    // 多行框固定高度，避免长内容把 AutoFit 高度撑爆
             _hostsBox.ScrollBars = ScrollBars.Both;
             _hostsBox.WordWrap = false;
             _hostsBox.AcceptsReturn = true;

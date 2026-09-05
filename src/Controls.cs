@@ -214,6 +214,7 @@ namespace WinTune
     {
         public int Radius = 8;
         bool _fitting;
+        bool _childrenFixed;   // Dock 按 index 降序停靠：首次布局前把子控件集合整体反转一次
         public RCard()
         {
             BackColor = C.Card;
@@ -239,6 +240,19 @@ namespace WinTune
         public void Recalc()
         {
             if (_fitting) return;
+            if (!_childrenFixed)
+            {
+                // Dock=Top 按 index 降序停靠：与“标题→内容”的添加顺序相反，首次整序时反转一次
+                _childrenFixed = true;
+                try
+                {
+                    var list = new System.Collections.Generic.List<Control>();
+                    foreach (Control ch in Controls) list.Add(ch);
+                    for (int i = 0; i < list.Count; i++)
+                        Controls.SetChildIndex(list[i], list.Count - 1 - i);
+                }
+                catch { }
+            }
             // 窗口在全屏切换/最小化等异常尺寸下不重算高度，防止把坏高度缓存下来
             if (ClientSize.Width < C.S(220)) return;
             _fitting = true;
@@ -247,12 +261,17 @@ namespace WinTune
                 int total = Padding.Top + Padding.Bottom;
                 int bottomH = 0;
                 int w = Math.Max(200, ClientSize.Width - Padding.Horizontal);
+                int maxChild = C.S(600);   // 单控件高度上限：FlowLayoutPanel 窄宽换行后可能缓存出异常 PreferredSize
                 foreach (Control ch in Controls)
                 {
                     int h = ch.Height;
                     if (ch.AutoSize)
                     {
-                        try { h = ch.GetPreferredSize(new Size(w, 0)).Height; }
+                        try
+                        {
+                            h = ch.GetPreferredSize(new Size(w, 0)).Height;
+                            if (h > maxChild) h = maxChild;
+                        }
                         catch { }
                     }
                     h += ch.Margin.Vertical;
@@ -262,6 +281,10 @@ namespace WinTune
                 }
                 total += bottomH;
                 int need = Math.Max(30, total);
+                // 防御：FlowLayoutPanel 等在窄宽换行后可能缓存出异常巨大的 PreferredSize，
+                // 单张卡片内容正常不可能超过 ~1100 逻辑像素，超限按上限截断防止坏高度固化
+                int cap = C.S(1100);
+                if (need > cap) need = cap;
                 if (Math.Abs(Height - need) > 2) Height = need;
             }
             finally { _fitting = false; }

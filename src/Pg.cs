@@ -112,12 +112,22 @@ namespace WinTune
             Root.Controls.Add(sp);
         }
 
-        /// <summary>页面构建完成后调用：两轮收敛卡片高度与布局，
-        /// 避免首次构建时卡片在未定型宽度下塌缩（“只有 hosts、工具不见”类问题）</summary>
+        /// <summary>页面构建完成后调用：先校正停靠顺序，再两轮收敛卡片高度与布局。
+        /// 注：WinForms Dock=Top 按集合 index 降序停靠（后添加的排最上），
+        /// 与页面按“标题→卡片”的添加顺序相反，故需将集合整体反转一次（幂等标记）。
+        /// 顺带解决“网络工具只剩 hosts 卡/标题沉底”的倒置问题。</summary>
         public void FinishPage()
         {
             try
             {
+                if (!_orderFixed)
+                {
+                    _orderFixed = true;
+                    var list = new System.Collections.Generic.List<Control>();
+                    foreach (Control c in Root.Controls) list.Add(c);
+                    for (int i = 0; i < list.Count; i++)
+                        Root.Controls.SetChildIndex(list[i], list.Count - 1 - i);
+                }
                 for (int round = 0; round < 2; round++)
                 {
                     foreach (Control c in Root.Controls)
@@ -131,6 +141,7 @@ namespace WinTune
             }
             catch { }
         }
+        bool _orderFixed;
 
         /// <summary>忙碌游标执行动作</summary>
         protected void Busy(Action a)

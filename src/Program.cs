@@ -200,17 +200,33 @@ namespace WinTune
         {
             string outDir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "uitest");
             try { if (!System.IO.Directory.Exists(outDir)) System.IO.Directory.CreateDirectory(outDir); } catch { }
-            var pages = new UPage[] {
+            var dump = new StringBuilder();
+            dump.AppendLine("════ UI 布局数值诊断 ════ " + DateTime.Now);
+            // 每个场景用全新的页面实例（避免窗体关闭后对象被释放）
+            RunDump(CreatePages(), dump, outDir, 1180, 760, "NORMAL-1180");
+            // 真实可达的最小窗口（FrmMain MinimumSize=1000 逻辑宽）压扁→还原
+            RunDump(CreatePages(), dump, outDir, 1180, 760, "SQUASH-RECOVER-1180", true, 1000, 650);
+            RunDump(CreatePages(), dump, outDir, 640, 520, "NARROW-640");
+            try { System.IO.File.WriteAllText(System.IO.Path.Combine(outDir, "layout.txt"), dump.ToString(), Encoding.UTF8); } catch { }
+        }
+
+        static UPage[] CreatePages()
+        {
+            return new UPage[] {
                 new PgOverview(), new PgOneKey(), new PgClean(), new PgStartup(),
                 new PgServices(), new PgNet(), new PgSoftware(), new PgTools(),
             };
+        }
+
+        static void RunDump(UPage[] pages, StringBuilder dump, string outDir, int w, int h, string tag, bool squash = false, int sqW = 200, int sqH = 200)
+        {
             for (int i = 0; i < pages.Length; i++)
             {
                 try
                 {
                     using (var f = new Form())
                     {
-                        f.Size = new System.Drawing.Size(C.S(1180), C.S(760));
+                        f.Size = new System.Drawing.Size(C.S(w), C.S(h));
                         f.FormBorderStyle = FormBorderStyle.None;
                         f.ShowInTaskbar = false;
                         f.StartPosition = FormStartPosition.Manual;
@@ -221,12 +237,60 @@ namespace WinTune
                         Application.DoEvents();
                         pages[i].OnShown();
                         Application.DoEvents();
+                        if (squash)
+                        {
+                            f.Size = new System.Drawing.Size(C.S(sqW), C.S(sqH));
+                            Application.DoEvents();
+                            f.Size = new System.Drawing.Size(C.S(w), C.S(h));
+                            Application.DoEvents();
+                            pages[i].Root.PerformLayout();
+                            Application.DoEvents();
+                        }
                         pages[i].Root.AutoScrollPosition = System.Drawing.Point.Empty;
                         Application.DoEvents();
+                        // 数值快照：Root 直接子控件的实际几何
+                        dump.AppendLine("── " + tag + " page#" + i + " (" + pages[i].GetType().Name + ")  Root=" +
+                            pages[i].Root.Width + "x" + pages[i].Root.Height);
+                        foreach (System.Windows.Forms.Control c in pages[i].Root.Controls)
+                        {
+                            string extra = "";
+                            var rc = c as RCard;
+                            if (rc != null)
+                            {
+                                int visibleTop = 0;
+                                foreach (System.Windows.Forms.Control ch in rc.Controls)
+                                {
+                                    if (ch.Visible && ch.Dock != System.Windows.Forms.DockStyle.Bottom)
+                                        visibleTop = System.Math.Max(visibleTop, ch.Bottom);
+                                }
+                                extra = " cardTopY=" + c.Top + " contentBottom=" + visibleTop;
+                                if (tag.StartsWith("SQUASH") && rc.Height > 700)
+                                {
+                                    // 异常大卡片：打印子控件明细
+                                    foreach (System.Windows.Forms.Control ch in rc.Controls)
+                                    {
+                                        string pref = "";
+                                        if (ch.AutoSize)
+                                        {
+                                            try
+                                            {
+                                                pref = " pref=" + ch.GetPreferredSize(new System.Drawing.Size(rc.ClientSize.Width - 48, 0)).Height;
+                                            }
+                                            catch { }
+                                        }
+                                        dump.AppendLine(string.Format("    ├ {0} H={1} Dock={2} Auto={3} Y={4}{5}",
+                                            ch.GetType().Name, ch.Height, ch.Dock, ch.AutoSize, ch.Top, pref));
+                                    }
+                                }
+                            }
+                            dump.AppendLine(string.Format("  [{0}] {1}  Bounds={2},{3} {4}x{5}  Dock={6}{7}",
+                                pages[i].Root.Controls.GetChildIndex(c), c.GetType().Name,
+                                c.Left, c.Top, c.Width, c.Height, c.Dock, extra));
+                        }
                         using (var bmp = new System.Drawing.Bitmap(f.Width, f.Height))
                         {
                             pages[i].DrawToBitmap(bmp, new System.Drawing.Rectangle(0, 0, f.Width, f.Height));
-                            string file = System.IO.Path.Combine(outDir, string.Format("ui{0}.png", i));
+                            string file = System.IO.Path.Combine(outDir, string.Format("ui{0}-{1}.png", i, tag.ToLower()));
                             bmp.Save(file, System.Drawing.Imaging.ImageFormat.Png);
                         }
                         f.Close();
@@ -234,7 +298,7 @@ namespace WinTune
                 }
                 catch (Exception ex)
                 {
-                    try { System.IO.File.WriteAllText(System.IO.Path.Combine(outDir, "err" + i + ".txt"), ex.ToString()); } catch { }
+                    dump.AppendLine("!! " + tag + " page#" + i + " 异常: " + ex);
                 }
             }
         }

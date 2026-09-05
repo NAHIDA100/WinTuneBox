@@ -119,12 +119,11 @@ namespace WinTune
             _tip.Dock = DockStyle.Top;
             _tip.Padding = new Padding(0, 0, 0, C.S(4));
             c3.Controls.Add(_tip);
+
+            // ── 内存优化卡（添加顺序=显示顺序：快捷卡之后、结尾留白之前）──
+            BuildMemCard();
+
             EndSpace(20);
-
-            // ── 内存优化卡（插在实时状态与快捷操作之间）──
-            var cm = BuildMemCard();
-            Root.Controls.SetChildIndex(cm, Root.Controls.GetChildIndex(c3));
-
             _timer.Tick += delegate { TickLive(); };
             FinishPage();
         }

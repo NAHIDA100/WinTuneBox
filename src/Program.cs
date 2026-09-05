@@ -39,6 +39,11 @@ namespace WinTune
                 foreach (string a in args)
                     if (string.Equals(a, "--minimized", StringComparison.OrdinalIgnoreCase))
                         StartMinimized = true;
+
+            // 免责声明：绿色版首次启动弹窗；安装版由安装器写入已同意标记
+            if (!CheckDisclaimer(StartMinimized))
+                return;   // 拒绝同意或静默启动且未同意 → 不启动
+
             // 内存优化实测：--memprobe（跑一次并写 selftest-mem.txt，验证清理量）
             if (args != null && args.Length > 0 && args[0].IndexOf("memprobe", StringComparison.OrdinalIgnoreCase) >= 0)
             {
@@ -58,6 +63,51 @@ namespace WinTune
             try { OS.RefreshMem(); } catch { }
             Application.Run(new FrmMain(StartMinimized));
             ReleaseInstance();
+        }
+
+        const string DisclaimKey = @"Software\WinTuneBox";
+        const string DisclaimVal = "DisclaimerShown";
+
+        static bool DisclaimerAccepted()
+        {
+            try
+            {
+                using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(DisclaimKey))
+                    return k != null && k.GetValue(DisclaimVal) != null;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// 免责声明检查。allowDialog=false（静默启动）时若尚未同意则直接退出，不打扰开机；
+        /// 开发/自动化可用环境变量 WTB_SKIP_DISCLAIMER=1 跳过。
+        /// </summary>
+        static bool CheckDisclaimer(bool allowDialog)
+        {
+            try
+            {
+                if (Environment.GetEnvironmentVariable("WTB_SKIP_DISCLAIMER") == "1") return true;
+                if (DisclaimerAccepted()) return true;
+                if (!allowDialog) return false;
+                string text =
+                    "本软件为免费开源的系统优化工具，仅供个人学习与使用。\n\n" +
+                    "使用前请确认：系统优化、清理、服务与注册表调整等操作可能影响系统稳定性。\n" +
+                    "因误操作、使用方法不当、系统环境差异或其他任何因素造成的系统损坏、设备损坏或数据丢失，" +
+                    "均与本软件作者无关，作者不承担任何责任。\n\n" +
+                    "本软件已提供操作前备份与撤销机制，请理解每项功能后再执行；重要数据请自行备份。\n\n" +
+                    "是否同意以上免责声明并继续使用？";
+                var r = MessageBox.Show(text, "免责声明",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (r != DialogResult.Yes) return false;
+                try
+                {
+                    using (var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(DisclaimKey))
+                        if (k != null) k.SetValue(DisclaimVal, 1);
+                }
+                catch { }
+                return true;
+            }
+            catch { return true; }
         }
 
         /// <summary>释放单实例互斥锁（提权重启前必须先释放，否则新实例会提示“已在运行”）</summary>
@@ -272,6 +322,15 @@ namespace WinTune
                                         visibleTop = System.Math.Max(visibleTop, ch.Bottom);
                                 }
                                 extra = " cardTopY=" + c.Top + " contentBottom=" + visibleTop;
+                                if (tag == "NORMAL-1180" && i == 0 && rc.Height > 200)
+                                {
+                                    foreach (System.Windows.Forms.Control ch in rc.Controls)
+                                    {
+                                        string txt = ch.Text ?? "";
+                                        if (txt.Length > 26) txt = txt.Substring(0, 26);
+                                        dump.AppendLine("      ⚙ " + ch.GetType().Name + " H=" + ch.Height + " Vis=" + ch.Visible + " 「" + txt + "」");
+                                    }
+                                }
                                 if (tag.StartsWith("SQUASH") && rc.Height > 700)
                                 {
                                     // 异常大卡片：打印子控件明细

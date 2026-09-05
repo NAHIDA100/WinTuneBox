@@ -1,7 +1,7 @@
 ﻿; ═══ Windows 优化工具箱 安装脚本 ═══
 ; 需要: Inno Setup 6 + Languages\ChineseSimplified.isl（本机已就绪）
 #define AppName "Windows 优化工具箱"
-#define AppVer "1.0.13"
+#define AppVer "1.0.14"
 #define ExeName "WinOptimizer.exe"
 
 [Setup]
@@ -18,6 +18,7 @@ OutputDir=dist
 OutputBaseFilename=Setup-Windows优化工具箱-{#AppVer}
 SetupIconFile=assets\app.ico
 UninstallDisplayIcon={app}\{#ExeName}
+LicenseFile=disclaimer.txt
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -33,6 +34,10 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: 
 [Files]
 Source: "dist\{#ExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "assets\app.ico"; DestDir: "{app}"; Flags: ignoreversion
+
+[Registry]
+; 安装版：安装即同意免责声明 → 写已同意标记，主程序首启不再弹
+Root: HKCU; Subkey: "Software\WinTuneBox"; ValueType: dword; ValueName: "DisclaimerShown"; ValueData: "1"; Flags: uninsdeletevalue
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#ExeName}"

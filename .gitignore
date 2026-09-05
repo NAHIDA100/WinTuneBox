@@ -1,9 +1,7 @@
-# 构建产物（发行文件见 dist 中的 exe/安装包，必要时可去掉注释以提交）
-dist/selftest.txt
-dist/_check.dll
+# ── 构建与发行产物（不入库；发布走 GitHub Releases，见 make-release.ps1）──
+dist/
+release/
 
 # 系统/编辑器杂项
 *.user
 Thumbs.db
-dist/uitest/
-dist/selftest-mem.txt

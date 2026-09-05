@@ -72,25 +72,45 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 产出：
 
 - `dist\WinOptimizer.exe` —— 绿色单文件
-- `dist\Setup-Windows优化工具箱-1.0.0.exe` —— Inno Setup 安装包（需 `D:\App\InnoSetup6`，可改 build.ps1 的 ISCC 路径）
+- `dist\Setup-Windows优化工具箱-<版本>.exe` —— Inno Setup 安装包（需 `D:\App\InnoSetup6`，可改 build.ps1 的 ISCC 路径）
 - `dist\selftest.txt` —— 自动运行的自检报告（无 GUI，验证系统识别/优化项检测/清理扫描/服务建议等）
 
 可选参数：`--skip-selftest`、`--no-installer`
+
+## 🚀 GitHub 发布流程
+
+```powershell
+powershell -ExecutionPolicy Bypass -File make-release.ps1
+```
+
+一键产出发行文件到 `release\`（不入库）：
+
+- `WinTuneBox-v1.0.15-绿色版.zip` —— 绿色版压缩包（exe + README + LICENSE + 免责声明）
+- `WinTuneBox-v1.0.15-安装版.exe` —— 中文安装程序
+- `SHA256SUMS.txt` —— 校验和
+
+然后在 GitHub Releases 创建 Tag（如 `v1.0.15`），上传上述 3 个文件并粘贴 CHANGELOG 对应条目即可。
 
 ## 📂 目录结构
 
 ```
 WinOptimizer/
-├─ src/              C# 源码（csc 直接编译，无第三方依赖）
-│  ├─ Controls.cs    浅色 UI 控件库（圆角卡片/扁平按钮/网格）
-│  ├─ Os.cs          系统信息与原生 API（Win7→Win11）
+├─ src/               C# 源码（csc 直接编译，无第三方依赖）
+│  ├─ Controls.cs     浅色 UI 控件库（圆角卡片 AutoFit/扁平按钮/网格）
+│  ├─ Os.cs           系统信息与原生 API（Win7→Win11，显卡智能识别）
+│  ├─ FloatBall.cs    加速悬浮球（贴边半透明/全屏自动隐藏）
 │  ├─ Cleaner.cs / StartupMgr.cs / ServicesMgr.cs
 │  ├─ NetMgr.cs / SoftMgr.cs / OpData.cs / SysTools.cs
-│  ├─ Pg*.cs         8 个功能页
-│  └─ FrmMain.cs / Program.cs（含 --selftest 自检模式）
-├─ assets/           make-icon.ps1（生成多尺寸 DIB 图标）
-├─ installer.iss     Inno Setup 脚本
-└─ build.ps1         一键构建
+│  ├─ Pg*.cs          8 个功能页
+│  └─ FrmMain.cs / Program.cs（--selftest/--uitest/--minimized）
+├─ assets/            make-icon.ps1（生成多尺寸 DIB 图标）
+├─ legacy/            v0.2 旧版原型（保留参考）
+├─ installer.iss      Inno Setup 脚本（含免责许可页）
+├─ disclaimer.txt     免责声明（安装许可页/绿色版随包）
+├─ build.ps1          构建（绿色版 + 安装包 + 自检）
+├─ make-release.ps1   发行打包（zip + 校验和）
+├─ CHANGELOG.md       更新日志
+└─ README.md / LICENSE
 ```
 
 ## ⚠️ 免责声明

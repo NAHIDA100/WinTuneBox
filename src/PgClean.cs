@@ -76,6 +76,7 @@ namespace WinTune
             EndSpace(10);
 
             FillList();
+            FinishPage();
         }
 
         void FillList()

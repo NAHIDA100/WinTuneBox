@@ -76,7 +76,7 @@ namespace WinTune
             var c2 = Card();
             var cardTitle = CardTitle(c2, "hosts 文件编辑器");
             _hostsState.AutoSize = true; _hostsState.Font = C.F(9f); _hostsState.ForeColor = C.Green;
-            _hostsState.Dock = DockStyle.Bottom;
+            _hostsState.Dock = DockStyle.Top;      // Top 停靠参与卡片高度计算（Bottom 会导致挤压）
             c2.Controls.Add(_hostsState);
             _hostsState.Text = NetMgr.HasBlock() ? "当前已包含遥测拦截段（可点下方按钮移除）" : "";
 
@@ -104,6 +104,7 @@ namespace WinTune
             EndSpace(20);
 
             FillDnsBoxes();
+            FinishPage();
         }
 
         FlatBtn navBtn(string text, Action act, int kind = 1)

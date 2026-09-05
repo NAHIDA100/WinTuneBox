@@ -64,6 +64,7 @@ namespace WinTune
             };
             Root.Controls.Add(_grid);
             EndSpace(10);
+            FinishPage();
         }
 
         FlatBtn flowBtn(string text, Action act, int kind = 1)

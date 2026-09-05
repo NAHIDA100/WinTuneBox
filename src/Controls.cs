@@ -232,6 +232,12 @@ namespace WinTune
         protected override void OnLayout(LayoutEventArgs levent)
         {
             base.OnLayout(levent);
+            Recalc();
+        }
+
+        /// <summary>按子控件重新计算高度（Top/Fill 顺序叠加，Bottom 另计在尾部）。可随时独立调用。</summary>
+        public void Recalc()
+        {
             if (_fitting) return;
             // 窗口在全屏切换/最小化等异常尺寸下不重算高度，防止把坏高度缓存下来
             if (ClientSize.Width < C.S(220)) return;
@@ -239,10 +245,10 @@ namespace WinTune
             try
             {
                 int total = Padding.Top + Padding.Bottom;
+                int bottomH = 0;
                 int w = Math.Max(200, ClientSize.Width - Padding.Horizontal);
                 foreach (Control ch in Controls)
                 {
-                    if (ch.Dock == DockStyle.Bottom) continue;
                     int h = ch.Height;
                     if (ch.AutoSize)
                     {
@@ -250,8 +256,11 @@ namespace WinTune
                         catch { }
                     }
                     h += ch.Margin.Vertical;
-                    if (h > 0) total += h;
+                    if (h <= 0) continue;
+                    if (ch.Dock == DockStyle.Bottom) bottomH += h;
+                    else total += h;
                 }
+                total += bottomH;
                 int need = Math.Max(30, total);
                 if (Math.Abs(Height - need) > 2) Height = need;
             }

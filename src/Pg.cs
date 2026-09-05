@@ -112,6 +112,26 @@ namespace WinTune
             Root.Controls.Add(sp);
         }
 
+        /// <summary>页面构建完成后调用：两轮收敛卡片高度与布局，
+        /// 避免首次构建时卡片在未定型宽度下塌缩（“只有 hosts、工具不见”类问题）</summary>
+        public void FinishPage()
+        {
+            try
+            {
+                for (int round = 0; round < 2; round++)
+                {
+                    foreach (Control c in Root.Controls)
+                    {
+                        var rc = c as RCard;
+                        if (rc != null) rc.Recalc();
+                    }
+                    Root.PerformLayout();
+                }
+                Root.Invalidate(true);
+            }
+            catch { }
+        }
+
         /// <summary>忙碌游标执行动作</summary>
         protected void Busy(Action a)
         {

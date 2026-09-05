@@ -61,6 +61,7 @@ namespace WinTune
             _grid.Columns.Add(_grid.Col("From", "来源", 8));
             Root.Controls.Add(_grid);
             EndSpace(8);
+            FinishPage();
         }
 
         void LoadList()

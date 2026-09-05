@@ -126,6 +126,7 @@ namespace WinTune
             Root.Controls.SetChildIndex(cm, Root.Controls.GetChildIndex(c3));
 
             _timer.Tick += delegate { TickLive(); };
+            FinishPage();
         }
 
         // ═══ 内存优化（PCL 风格：点击即优化并报告释放量）═══

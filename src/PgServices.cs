@@ -70,6 +70,7 @@ namespace WinTune
             _grid.Columns.Add(_grid.Col("Desc", "映像路径", 13));
             Root.Controls.Add(_grid);
             EndSpace(8);
+            FinishPage();
         }
 
         FlatBtn flowBtn(string text, Action act, int kind = 1)

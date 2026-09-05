@@ -67,6 +67,7 @@ namespace WinTune
             };
             Root.Controls.Add(_grid);
             EndSpace(8);
+            FinishPage();
         }
 
         void LoadItems()

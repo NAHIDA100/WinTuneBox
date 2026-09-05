@@ -143,6 +143,7 @@ namespace WinTune
             c7.Controls.Add(lg);
             _log = lg;
             EndSpace(20);
+            FinishPage();
         }
 
         FlatBtn toolBtn(string text, Action act, int kind = 1)

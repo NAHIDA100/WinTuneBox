@@ -159,6 +159,35 @@ namespace WinTune
             return n;
         }
 
+        /// <summary>当前可用物理内存（MB）</summary>
+        public static long AvailableMB()
+        {
+            OS.RefreshMem();
+            return (long)(OS.FreeRam / (1024.0 * 1024.0));
+        }
+
+        /// <summary>
+        /// 一次完整的“内存优化”（PCL 风格）：整理全部进程工作集，
+        /// 等待系统回收后对比可用内存变化。返回描述文本，如
+        /// “整理 240 个进程 · 可用内存增加 1.2 GB（8.1 → 9.3 GB）”。
+        /// 注意：耗时约 1.5 秒，请在后台线程调用。
+        /// </summary>
+        public static string OptimizeMemoryNow()
+        {
+            long before = AvailableMB();
+            int n = CleanAllMemory();
+            // 给系统一点时间把换出页面并入空闲列表
+            System.Threading.Thread.Sleep(1400);
+            long after = AvailableMB();
+            long freedMb = after - before;
+            if (freedMb < 0) freedMb = 0;
+            return string.Format("整理 {0} 个进程 · 可用内存增加 {1}（{2} → {3} GB）",
+                n,
+                freedMb >= 1024 ? (freedMb / 1024.0).ToString("F2") + " GB" : freedMb + " MB",
+                (before / 1024.0).ToString("F2"),
+                (after / 1024.0).ToString("F2"));
+        }
+
         // ── 电源计划 ──
         public static string SwitchPowerScheme(string targetName)
         {

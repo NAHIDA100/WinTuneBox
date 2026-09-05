@@ -3,13 +3,14 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 namespace WinTune
 {
     // ═══ 主窗体：左侧导航 + 内容区 ═══
     public class FrmMain : Form
     {
-        public const string Ver = "1.0.1";
+        public const string Ver = "1.0.2";
         public const string AppName = "Windows 优化工具箱";
 
         const int SIDEBAR_W = 186;
@@ -19,6 +20,13 @@ namespace WinTune
         readonly Panel _host = new Panel();
         readonly Label _perm = new Label();
         int _cur = -1;
+        PgOverview _ov;
+
+        // ── 托盘常驻（内存优化，PCL 风格）──
+        NotifyIcon _tray;
+        bool _trayOptBusy;
+        DateTime _lastTrayLeft = DateTime.MinValue;
+        bool _trayPendingClick;                    // 单击防抖：350ms 内第二次单击视为双击
 
         public FrmMain()
         {
@@ -124,9 +132,9 @@ namespace WinTune
             _host.Padding = new Padding(C.S(20), C.S(16), C.S(16), C.S(8));
 
             // ── 页面 ──
-            var ov = new PgOverview();
+            _ov = new PgOverview();
             var pages = new UPage[] {
-                ov,
+                _ov,
                 new PgOneKey(),
                 new PgClean(),
                 new PgStartup(),
@@ -136,7 +144,8 @@ namespace WinTune
                 new PgTools(),
             };
             _pages = pages;
-            ov.GotoPage = Go;
+            _ov.GotoPage = Go;
+            _ov.TrayToggle = TraySet;
             foreach (var p in _pages)
             {
                 p.Visible = false;
@@ -154,6 +163,125 @@ namespace WinTune
                         "当前未以管理员身份运行。\n\n绝大多数优化/清理功能（服务、注册表 HKLM、hosts、系统修复）需要管理员权限。\n可在左侧底部“以管理员身份运行”处一键提权重启，普通浏览不受影响。",
                         "权限提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
             };
+
+            // 若上次启用了托盘常驻，本次自动恢复
+            try
+            {
+                int? v = Regs.Dword(RegistryHive.CurrentUser, RegistryView.Default,
+                    PgOverview.TrayRegKey, "TrayIcon");
+                if (v != null && v.Value == 1) TraySet(true);
+            }
+            catch { }
+            FormClosed += delegate { DisposeTray(); };
+        }
+
+        // ═══ 托盘常驻：单击=内存优化，双击=打开主界面，右键=菜单 ═══
+        void TraySet(bool on)
+        {
+            if (on)
+            {
+                if (_tray != null) return;
+                _tray = new NotifyIcon();
+                try { _tray.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); }
+                catch { _tray.Icon = SystemIcons.Application; }
+                _tray.Text = "Windows 优化工具箱（左键单击=内存优化，双击=打开）";
+                _tray.Visible = true;
+                _tray.MouseClick += TrayMouseClick;
+                _tray.MouseDoubleClick += TrayMouseDoubleClick;
+                _tray.ContextMenuStrip = TrayMenu();
+                _tray.ShowBalloonTip(1800, "Windows 优化工具箱", "已常驻通知区域：\n左键单击 = 立即执行一次内存优化\n双击 = 打开工具箱", ToolTipIcon.Info);
+            }
+            else
+            {
+                DisposeTray();
+            }
+        }
+
+        void DisposeTray()
+        {
+            if (_tray != null)
+            {
+                try { _tray.Visible = false; } catch { }
+                try { _tray.Dispose(); } catch { }
+                _tray = null;
+            }
+        }
+
+        ContextMenuStrip TrayMenu()
+        {
+            var m = new ContextMenuStrip();
+            m.Font = C.F(9f);
+            m.Items.Add("立即内存优化", null, delegate { TrayOptimize(); });
+            m.Items.Add("打开工具箱", null, delegate { ShowMain(); });
+            m.Items.Add("隐藏窗口（保持常驻）", null, delegate { Hide(); });
+            m.Items.Add(new ToolStripSeparator());
+            m.Items.Add("退出", null, delegate { Application.Exit(); });
+            return m;
+        }
+
+        void ShowMain()
+        {
+            if (InvokeRequired) { try { BeginInvoke((MethodInvoker)ShowMain); } catch { } return; }
+            if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+            Show();
+            BringToFront();
+            Activate();
+        }
+
+        void TrayMouseClick(object s, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left) return;
+            // 防抖：双击会触发两次单击；350ms 内的第二次单击视为双击的一部分，不执行优化
+            if ((DateTime.Now - _lastTrayLeft).TotalMilliseconds < 350)
+            {
+                _lastTrayLeft = DateTime.Now;
+                _trayPendingClick = false;
+                return;
+            }
+            _lastTrayLeft = DateTime.Now;
+            _trayPendingClick = true;
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate
+            {
+                System.Threading.Thread.Sleep(380);
+                if (!_trayPendingClick) return;      // 后续来了双击/第二次单击 → 放弃
+                TrayOptimize();
+            });
+        }
+
+        void TrayMouseDoubleClick(object s, MouseEventArgs e)
+        {
+            _trayPendingClick = false;
+            ShowMain();
+        }
+
+        /// <summary>托盘触发的一次内存优化（后台执行，完成后气泡报告）</summary>
+        void TrayOptimize()
+        {
+            if (_trayOptBusy) return;
+            _trayOptBusy = true;
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate
+            {
+                string report;
+                try { report = SysTools.OptimizeMemoryNow(); }
+                catch (Exception ex) { report = "优化失败: " + ex.Message; }
+                // 气泡与界面更新都回主线程执行
+                C.On(this, delegate
+                {
+                    if (_ov != null) _ov.SetMemResultText(report);
+                    NotifyIcon n = _tray;
+                    if (n != null)
+                    {
+                        try
+                        {
+                            n.BalloonTipTitle = "内存优化完成";
+                            n.BalloonTipText = report;
+                            n.ShowBalloonTip(2200);
+                        }
+                        catch { }
+                    }
+                });
+                _trayOptBusy = false;
+            });
         }
 
         void UpdatePerm()

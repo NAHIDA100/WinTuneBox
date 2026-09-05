@@ -262,11 +262,16 @@ namespace WinTune
 
         void CleanMem()
         {
-            Busy(delegate
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate
             {
-                int n = SysTools.CleanAllMemory();
-                string tip = "已对所有 " + n + " 个进程进行工作集整理。\n（内存用量会随程序运行自然回升，属正常现象）";
-                C.On(this, delegate { MessageBox.Show(this, tip, "完成"); });
+                string report;
+                try { report = SysTools.OptimizeMemoryNow(); }
+                catch (Exception ex) { report = "优化失败: " + ex.Message; }
+                C.On(this, delegate
+                {
+                    MessageBox.Show(this, report + "\n\n（内存用量会随程序读写自然回升，属正常现象）", "内存优化完成",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                });
             });
         }
 

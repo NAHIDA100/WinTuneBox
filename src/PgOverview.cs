@@ -3,20 +3,29 @@ using System.Drawing;
 using System.IO;
 using System.Text;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 namespace WinTune
 {
-    // ═══ 概览：系统信息 / 实时状态 / 快捷入口 ═══
+    // ═══ 概览：系统信息 / 实时状态 / 内存优化 / 快捷入口 ═══
     public class PgOverview : UPage
     {
         public Action<int> GotoPage;
+        public Action<bool> TrayToggle;            // 由主窗体注入：开关托盘常驻
         readonly Timer _timer = new Timer { Interval = 2000 };
         readonly Label _cpuTxt = new Label(), _ramTxt = new Label(), _diskTxt = new Label();
         readonly MBar _cpuBar = new MBar(), _ramBar = new MBar { Fill = C.Green }, _diskBar = new MBar { Fill = C.Orange };
         readonly Label _tip = new Label();
+        readonly Label _memNow = new Label();
+        readonly Label _memResult = new Label();
+        readonly CheckBox _chkTray = new CheckBox();
+        FlatBtn _btnMem;
+        bool _memBusy;
         bool _built;
         TableLayoutPanel _grid1;
         Metric[] _met;
+
+        public const string TrayRegKey = @"Software\WinTuneBox";
 
         public PgOverview()
         {
@@ -108,7 +117,96 @@ namespace WinTune
             c3.Controls.Add(_tip);
             EndSpace(20);
 
+            // ── 内存优化卡（插在实时状态与快捷操作之间）──
+            var cm = BuildMemCard();
+            Root.Controls.SetChildIndex(cm, Root.Controls.GetChildIndex(c3));
+
             _timer.Tick += delegate { TickLive(); };
+        }
+
+        // ═══ 内存优化（PCL 风格：点击即优化并报告释放量）═══
+        RCard BuildMemCard()
+        {
+            var cm = Card();
+            CardTitle(cm, "内存优化");
+
+            var row1 = new Panel { Dock = DockStyle.Top, Height = C.S(40) };
+            row1.Controls.Add(C.Lbl("当前可用物理内存", 9f, C.TextSub, false));
+            _memNow.Text = "—";
+            _memNow.Font = C.F(12f, true);
+            _memNow.ForeColor = C.Accent;
+            _memNow.AutoSize = true;
+            _memNow.Location = new Point(C.S(130), 0);
+            _btnMem = C.Btn("立即优化内存", 0);
+            _btnMem.AutoSize = false;
+            _btnMem.Width = C.S(140);
+            _btnMem.Location = new Point(C.S(300), 0);
+            _btnMem.Click += delegate { RunMemOptimize(null); };
+            row1.Controls.Add(_memNow);
+            row1.Controls.Add(_btnMem);
+            cm.Controls.Add(row1);
+
+            _memResult.Font = C.F(9.5f);
+            _memResult.ForeColor = C.Green;
+            _memResult.AutoSize = true;
+            _memResult.Dock = DockStyle.Top;
+            _memResult.Padding = new Padding(0, 0, 0, C.S(6));
+            cm.Controls.Add(_memResult);
+
+            var row2 = new Panel { Dock = DockStyle.Top, Height = C.S(30) };
+            _chkTray.Text = "在任务栏通知区域常驻图标（左键单击=执行一次内存优化，双击=打开工具箱）";
+            _chkTray.Font = C.F(9f);
+            _chkTray.AutoSize = true;
+            _chkTray.ForeColor = C.TextMain;
+            _chkTray.Location = new Point(0, C.S(2));
+            try
+            {
+                int? v = Regs.Dword(RegistryHive.CurrentUser, RegistryView.Default, TrayRegKey, "TrayIcon");
+                _chkTray.Checked = v != null && v.Value == 1;
+            }
+            catch { }
+            _chkTray.CheckedChanged += delegate
+            {
+                try
+                {
+                    if (_chkTray.Checked)
+                        Regs.SetDword(RegistryHive.CurrentUser, RegistryView.Default, TrayRegKey, "TrayIcon", 1);
+                    else
+                        Regs.DelVal(RegistryHive.CurrentUser, RegistryView.Default, TrayRegKey, "TrayIcon");
+                }
+                catch { }
+                if (TrayToggle != null) TrayToggle(_chkTray.Checked);
+            };
+            row2.Controls.Add(_chkTray);
+            cm.Controls.Add(row2);
+            CardNote(cm, "优化原理与 PCL 启动器一致：清空各进程的工作集内存，系统会把这些页面转为可用内存。程序重新读写时会自然恢复，属正常现象。");
+            return cm;
+        }
+
+        /// <summary>执行一次内存优化（后台线程，完成后更新结果标签）。fromTray 来自托盘时顺带弹气泡交给主窗体处理。</summary>
+        public void RunMemOptimize(Action<string> onDone)
+        {
+            if (_memBusy) return;
+            _memBusy = true;
+            if (_btnMem != null) { _btnMem.Enabled = false; _btnMem.Text = "优化中…"; }
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate
+            {
+                string report;
+                try { report = SysTools.OptimizeMemoryNow(); }
+                catch (Exception ex) { report = "优化失败: " + ex.Message; }
+                C.On(this, delegate
+                {
+                    if (_btnMem != null) { _btnMem.Enabled = true; _btnMem.Text = "立即优化内存"; }
+                    _memResult.Text = "最近一次：" + report;
+                    if (onDone != null) onDone(report);
+                    _memBusy = false;
+                });
+            });
+        }
+
+        public void SetMemResultText(string report)
+        {
+            C.On(this, delegate { _memResult.Text = "最近一次：" + report; });
         }
 
         Metric MkM(string cap)
@@ -207,6 +305,7 @@ namespace WinTune
             OS.DiskInfo(OS.SystemDrive, out free, out total);
             _cpuTxt.Text = cpu + " %";
             _ramTxt.Text = OS.RamLoad + " %";
+            if (_memNow != null) _memNow.Text = (OS.FreeRam / 1073741824.0).ToString("F2") + " GB";
             _cpuBar.Value = cpu;
             _ramBar.Value = OS.RamLoad;
             if (total > 0)

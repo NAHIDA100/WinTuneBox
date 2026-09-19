@@ -108,7 +108,7 @@
 - 系统自带的 **.NET Framework 4.8**（Win10 1607 以上和 Win11 都自带，不用自己装）
 - 装完大约占 **2.5 MB** 磁盘空间
 
-> 还在用 Windows 7 / 8？请用旧版 **https://github.com/NAHIDA100/WinOptimizer**。
+> 还在用 Windows 7 / 8？请用旧版 **https://github.com/NAHIDA100/WinOptimizer**
 
 ---
 

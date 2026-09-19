@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SignPath.io 制品配置 —— 安装包
+
+  用途：.github\workflows\signpath.yml 的第 2 个签名轮次。
+  上传的 zip 里必须**平铺**放这两个文件：
+      Setup-x64.exe
+      Setup-x86.exe
+
+  注意：这一步必须在主程序签完之后。安装包会把主程序内嵌进去，
+  顺序反了的话用户装完看到的仍然是「未知发布者」。
+
+  在 SignPath 后台新建一条记录、slug 设为 `wintunebox-installers`。
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <zip-file>
+    <pe-file path="Setup-x64.exe">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="Setup-x86.exe">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

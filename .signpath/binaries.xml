@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SignPath.io 制品配置 —— 主程序
+
+  用途：.github\workflows\signpath.yml 的第 1 个签名轮次。
+  上传的 zip 里必须**平铺**放这两个文件（ASCII 名，避免中文文件名带来的编码问题）：
+      WinTuneBox-x64.exe
+      WinTuneBox-x86.exe
+
+  在 SignPath 后台（Project → Artifact Configurations）新建一条记录、
+  把 slug 设为 `wintunebox-binaries`，内容粘贴本文件（或用 SignPath 的校验器先校验）。
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <zip-file>
+    <pe-file path="WinTuneBox-x64.exe">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="WinTuneBox-x86.exe">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

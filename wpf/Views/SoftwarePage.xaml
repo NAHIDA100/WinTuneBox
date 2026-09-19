@@ -1,0 +1,79 @@
+﻿<UserControl x:Class="WinTune.Wpf.Views.SoftwarePage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid Margin="30,26,30,26">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+    </Grid.RowDefinitions>
+
+    <Grid Grid.Row="0" Margin="0,0,0,16">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <StackPanel>
+        <TextBlock Text="软件管理" FontSize="24" FontWeight="Bold"/>
+        <TextBlock Text="查看与卸载已安装的桌面程序和应用商店(UWP)应用"
+                   Foreground="{DynamicResource SecondaryTextBrush}" FontSize="13" Margin="1,4,0,0" TextWrapping="Wrap"/>
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+        <Button x:Name="AppxBtn" Content="加载商店应用" Style="{StaticResource BtnDefault}" Click="Appx_Click"/>
+        <Button x:Name="RefreshBtn" Content="刷新" Style="{StaticResource BtnPrimary}" Click="Refresh_Click"/>
+      </StackPanel>
+    </Grid>
+
+    <Grid Grid.Row="1" Margin="0,0,0,10">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="280"/>
+      </Grid.ColumnDefinitions>
+      <TextBlock x:Name="Summary" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" Text="加载中…"/>
+      <TextBox x:Name="Search" Grid.Column="1" TextChanged="Search_Changed"/>
+    </Grid>
+
+    <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0">
+      <ListBox x:Name="List" Background="Transparent" BorderThickness="0">
+        <ListBox.ItemContainerStyle>
+          <Style TargetType="ListBoxItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Template">
+              <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                  <Border Background="Transparent" Padding="{TemplateBinding Padding}"><ContentPresenter/></Border>
+                </ControlTemplate>
+              </Setter.Value>
+            </Setter>
+          </Style>
+        </ListBox.ItemContainerStyle>
+        <ListBox.ItemTemplate>
+          <DataTemplate>
+            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="6,8">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13.5" TextTrimming="CharacterEllipsis" MaxWidth="480"/>
+                    <TextBlock Text="{Binding Version}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                  </StackPanel>
+                  <TextBlock FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" MaxWidth="560">
+                    <Run Text="{Binding Publisher, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding From, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding SizeText, Mode=OneWay}"/>
+                  </TextBlock>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                  <Button Width="64" Style="{StaticResource BtnDefault}" Padding="8,5" Margin="0,0,6,0" Content="目录" Click="Folder_Click"/>
+                  <Button Width="64" Style="{StaticResource BtnDanger}" Padding="8,5" Content="卸载" Click="Uninstall_Click"/>
+                </StackPanel>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Border>
+  </Grid>
+</UserControl>

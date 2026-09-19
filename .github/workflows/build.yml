@@ -1,0 +1,65 @@
+﻿name: build
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+# 源码与发行版完全分离（见 tools\paths.ps1）：产物默认落在**同级目录**，
+# 在 CI 里把它钉回 workspace 根，产物路径就与本地约定一致、且不会跑到 checkout 外面。
+env:
+  WINTUNEBOX_OUT: ${{ github.workspace }}
+
+jobs:
+  build:
+    name: v2 ${{ matrix.arch }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [ x64, x86 ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 构建 v2（${{ matrix.arch }}，只读自检，不打安装包）
+        shell: pwsh
+        run: ./build.ps1 -Target v2 -Arch ${{ matrix.arch }} -NoInstaller
+
+      - name: 校验产物存在
+        shell: pwsh
+        run: |
+          $exe = "dist/${{ matrix.arch }}/WinTuneBox.exe"
+          if (-not (Test-Path $exe)) { throw "缺少产物 $exe" }
+          $len = (Get-Item $exe).Length
+          Write-Host "$exe  $len bytes"
+          if ($len -lt 200KB) { throw "产物体积异常，疑似构建失败" }
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinTuneBox-v2-${{ matrix.arch }}
+          path: |
+            dist/${{ matrix.arch }}/WinTuneBox.exe
+          if-no-files-found: error
+
+      - name: 上传自检报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selftest-${{ matrix.arch }}
+          path: |
+            ${{ env.LOCALAPPDATA }}/WinTuneBox/logs/selftest-latest.txt
+            ${{ env.LOCALAPPDATA }}/WinTuneBox/logs/log-*.txt
+          if-no-files-found: warn
+
+  v1-legacy:
+    name: v1 legacy (可复现构建)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 构建冻结的 v1
+        shell: pwsh
+        run: ./build.ps1 -Target v1 -NoInstaller

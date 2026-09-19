@@ -1,0 +1,22 @@
+﻿<Window x:Class="WinTune.Wpf.FloatBall"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="FloatBall" Width="58" Height="58"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" Topmost="True" ResizeMode="NoResize"
+        WindowStartupLocation="Manual" UseLayoutRounding="True">
+  <Border x:Name="Ball" Width="58" Height="58" CornerRadius="29"
+          Background="{StaticResource BrandGradient}" Opacity="0.82"
+          MouseMove="Ball_MouseMove"
+          MouseLeftButtonDown="Ball_MouseLeftButtonDown"
+          MouseLeftButtonUp="Ball_MouseLeftButtonUp"
+          MouseEnter="Ball_MouseEnter" MouseLeave="Ball_MouseLeave">
+    <Border.Effect><DropShadowEffect Color="#33000000" BlurRadius="16" ShadowDepth="3" Opacity="0.6"/></Border.Effect>
+    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+      <TextBlock Text="&#xE945;" FontFamily="{StaticResource IconFont}" FontSize="22"
+                 Foreground="White" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+      <TextBlock x:Name="MemText" Text="" FontSize="9.5" Foreground="White"
+                 HorizontalAlignment="Center" Margin="0,1,0,0"/>
+    </StackPanel>
+  </Border>
+</Window>

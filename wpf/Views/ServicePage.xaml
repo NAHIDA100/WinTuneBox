@@ -1,0 +1,84 @@
+﻿<UserControl x:Class="WinTune.Wpf.Views.ServicePage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid Margin="30,26,30,26">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+    </Grid.RowDefinitions>
+
+    <Grid Grid.Row="0" Margin="0,0,0,16">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <StackPanel>
+        <TextBlock Text="服务优化" FontSize="24" FontWeight="Bold"/>
+        <TextBlock Text="按安全规则建议关闭/手动化非必要服务；所有改动记录可一键还原"
+                   Foreground="{DynamicResource SecondaryTextBrush}" FontSize="13" Margin="1,4,0,0" TextWrapping="Wrap"/>
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+        <Button x:Name="UndoBtn" Content="全部还原" Style="{StaticResource BtnDefault}" Click="Undo_Click"/>
+        <Button x:Name="ApplyAllBtn" Content="一键应用推荐" Style="{StaticResource BtnPrimary}" Click="ApplyAll_Click"/>
+        <Button x:Name="RefreshBtn" Content="重新扫描" Style="{StaticResource BtnDefault}" Click="Refresh_Click"/>
+      </StackPanel>
+    </Grid>
+
+    <TextBlock Grid.Row="1" x:Name="Summary" Margin="2,0,0,10" Foreground="{DynamicResource SecondaryTextBrush}" Text="加载中…"/>
+
+    <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0">
+      <DockPanel>
+        <Border DockPanel.Dock="Top" Background="{StaticResource WarnLightBrush}" CornerRadius="6" Padding="10,7" Margin="0,0,0,8">
+          <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource WarnBrush}"
+                     Text="说明：建议仅在确实不需要对应功能时应用（如不用打印机可关闭打印服务）。应用需要管理员权限；不确定的服务请保持默认。"/>
+        </Border>
+        <ListBox x:Name="List" Background="Transparent" BorderThickness="0">
+          <ListBox.ItemContainerStyle>
+            <Style TargetType="ListBoxItem">
+              <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+              <Setter Property="Padding" Value="0"/>
+              <Setter Property="Template">
+                <Setter.Value>
+                  <ControlTemplate TargetType="ListBoxItem">
+                    <Border Background="Transparent" Padding="{TemplateBinding Padding}"><ContentPresenter/></Border>
+                  </ControlTemplate>
+                </Setter.Value>
+              </Setter>
+            </Style>
+          </ListBox.ItemContainerStyle>
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="6,8">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="{Binding Display}" FontWeight="SemiBold" FontSize="13.5"/>
+                      <TextBlock Text="{Binding Name}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}"
+                                 Margin="8,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding Why}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}"
+                               TextWrapping="Wrap" Margin="0,2,0,0"/>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border CornerRadius="4" Padding="8,3" VerticalAlignment="Center" Margin="0,0,8,0"
+                            Background="{DynamicResource SecondaryRegionBrush}">
+                      <TextBlock FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}">
+                        <Run Text="当前 "/><Run Text="{Binding CurStart, Mode=OneWay}"/><Run Text=" → "/><Run Text="{Binding RecStart, Mode=OneWay}"/>
+                      </TextBlock>
+                    </Border>
+                    <Button Width="72" Style="{StaticResource BtnDefault}" Padding="8,5" Content="应用" Click="ApplyOne_Click"/>
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </Border>
+  </Grid>
+</UserControl>

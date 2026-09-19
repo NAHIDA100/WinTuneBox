@@ -1,0 +1,144 @@
+﻿<local:FluentWindow x:Class="WinTune.Wpf.MainWindow"
+                    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:local="clr-namespace:WinTune.Wpf"
+                    Title="WinTuneBox 优化工具箱"
+                    Width="1180" Height="768" MinWidth="720" MinHeight="540"
+                    WindowStartupLocation="CenterScreen"
+                    FontFamily="{StaticResource AppFont}"
+                    Background="{DynamicResource WindowBackgroundBrush}"
+                    UseLayoutRounding="True">
+
+  <Grid x:Name="RootGrid">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="44"/>
+      <RowDefinition Height="*"/>
+    </Grid.RowDefinitions>
+
+    <!-- ══ 标题栏 ══ -->
+    <Grid Grid.Row="0" Background="{DynamicResource TitleBarBrush}">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+
+      <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="14,0,0,0" VerticalAlignment="Center"
+                  IsHitTestVisible="False">
+        <Border Width="24" Height="24" CornerRadius="6" Background="{StaticResource BrandGradient}">
+          <TextBlock Text="&#xE945;" FontFamily="{StaticResource IconFont}" FontSize="13" Foreground="White"
+                     HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+        <TextBlock Text="WinTuneBox" Margin="9,0,0,0" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
+        <TextBlock Text="v2.0" Margin="6,1,0,0" FontSize="11" VerticalAlignment="Center"
+                   Foreground="{DynamicResource TextTertiaryBrush}"/>
+      </StackPanel>
+
+      <TextBlock x:Name="TitlePage" Grid.Column="1" Margin="16,0,0,0" FontSize="12.5" VerticalAlignment="Center"
+                 Foreground="{DynamicResource SecondaryTextBrush}" IsHitTestVisible="False"/>
+
+      <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top"
+                  WindowChrome.IsHitTestVisibleInChrome="True">
+        <Button x:Name="ThemeBtn" Style="{StaticResource CaptionButton}" Click="Theme_Click" ToolTip="切换浅色 / 深色">
+          <TextBlock x:Name="ThemeGlyph" Text="&#xE706;" FontFamily="{StaticResource IconFont}" FontSize="10"/>
+        </Button>
+        <Button x:Name="MinBtn" Style="{StaticResource CaptionButton}" Click="Min_Click" ToolTip="最小化">
+          <TextBlock x:Name="MinGlyph" Text="&#xE921;" FontFamily="{StaticResource IconFont}" FontSize="10"/>
+        </Button>
+        <Button x:Name="MaxBtn" Style="{StaticResource CaptionButton}" Click="Max_Click" ToolTip="最大化">
+          <TextBlock x:Name="MaxGlyph" Text="&#xE922;" FontFamily="{StaticResource IconFont}" FontSize="10"/>
+        </Button>
+        <Button x:Name="CloseBtn" Style="{StaticResource CaptionButtonClose}" Click="Close_Click" ToolTip="关闭">
+          <TextBlock x:Name="CloseGlyph" Text="&#xE8BB;" FontFamily="{StaticResource IconFont}" FontSize="10"/>
+        </Button>
+      </StackPanel>
+    </Grid>
+
+    <!-- ══ 主体：导航 + 页面 ══ -->
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition x:Name="NavColumn" Width="236"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+
+      <Border Grid.Column="0" Background="{DynamicResource NavBackgroundBrush}"
+              BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,1,0">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+
+          <!-- 命令面板入口 -->
+          <Button x:Name="PaletteBtn" Grid.Row="0" Style="{StaticResource SearchButton}" Click="Palette_Click"
+                  Margin="12,10,12,6" HorizontalContentAlignment="Left" Cursor="Hand">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE721;" FontFamily="{StaticResource IconFont}" FontSize="12"
+                         Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center"/>
+              <TextBlock x:Name="PaletteHint" Text="搜索功能  (Ctrl+K)" Margin="8,0,0,0" FontSize="12"
+                         Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center"/>
+            </StackPanel>
+          </Button>
+
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl x:Name="NavList" Margin="0,2,0,10" RadioButton.Checked="Nav_Checked"/>
+          </ScrollViewer>
+
+          <StackPanel Grid.Row="2" Margin="12,0,12,12">
+            <!-- 一键整理内存：常驻显眼位置的快捷动作 -->
+            <Border Height="1" Margin="2,0,2,8" Background="{DynamicResource DividerBrush}"/>
+            <Button x:Name="MemBtn" Style="{StaticResource NavAction}" Click="Mem_Click"
+                    ToolTip="一键整理内存：清理各进程工作集，被占用内存会换出到页面文件">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock x:Name="MemIcon" Text="&#xE964;" FontFamily="{StaticResource IconFont}"
+                           FontSize="13" Width="20" TextAlignment="Center" VerticalAlignment="Center"/>
+                <TextBlock x:Name="MemLabel" Text="一键整理内存" Margin="6,0,0,0"
+                           VerticalAlignment="Center"/>
+              </StackPanel>
+            </Button>
+
+            <Border x:Name="AdminBar" CornerRadius="6" Padding="10,8" Cursor="Hand" Margin="0,8,0,0"
+                    Background="{DynamicResource WarnLightBrush}" MouseLeftButtonUp="Admin_Click">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="AdminIcon" Text="&#xE72E;" FontFamily="{StaticResource IconFont}" FontSize="13"
+                           Width="20" VerticalAlignment="Top" Foreground="{DynamicResource WarnBrush}"/>
+                <TextBlock x:Name="AdminText" Grid.Column="1" Text="检测权限中…" FontSize="11.6"
+                           TextWrapping="Wrap" Margin="6,0,0,0" Foreground="{DynamicResource WarnBrush}"/>
+              </Grid>
+            </Border>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <ContentControl x:Name="Host" Grid.Column="1" Margin="22,16,18,0" Focusable="False"/>
+    </Grid>
+
+    <!-- ══ 通知浮层 ══ -->
+    <local:ToastHost x:Name="ToastArea" Grid.Row="0" Grid.RowSpan="2"/>
+
+    <!-- ══ 命令面板 ══ -->
+    <Grid x:Name="PaletteLayer" Grid.Row="0" Grid.RowSpan="2" Visibility="Collapsed"
+          Background="#66000000" MouseLeftButtonDown="PaletteBackdrop_Click">
+      <Border Width="520" MaxHeight="440" VerticalAlignment="Top" Margin="0,110,0,0"
+              CornerRadius="10" Padding="14"
+              Background="{DynamicResource MenuBackgroundBrush}"
+              BorderBrush="{DynamicResource ToastBorderBrush}" BorderThickness="1">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+          <TextBox x:Name="PaletteInput" Grid.Row="0" Style="{StaticResource SearchBox}"
+                   TextChanged="PaletteInput_TextChanged" KeyDown="PaletteInput_KeyDown"/>
+          <ListBox x:Name="PaletteList" Grid.Row="1" Margin="0,10,0,0" MaxHeight="350"
+                   MouseDoubleClick="PaletteList_DoubleClick" KeyDown="PaletteList_KeyDown"/>
+        </Grid>
+      </Border>
+    </Grid>
+  </Grid>
+</local:FluentWindow>

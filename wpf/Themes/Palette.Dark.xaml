@@ -1,0 +1,63 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- ══ 深色主题 ══ -->
+  <Color x:Key="BrandColor">#4C97FF</Color>
+  <SolidColorBrush x:Key="BrandBrush" Color="#4C97FF"/>
+  <SolidColorBrush x:Key="BrandHoverBrush" Color="#62A6FF"/>
+  <SolidColorBrush x:Key="BrandPressedBrush" Color="#3A7FD8"/>
+  <SolidColorBrush x:Key="BrandLightBrush" Color="#334C97FF"/>
+  <SolidColorBrush x:Key="BrandDarkBrush" Color="#3A7FD8"/>
+  <LinearGradientBrush x:Key="BrandGradient" StartPoint="0,0" EndPoint="1,1">
+    <GradientStop Color="#5AA4FF" Offset="0"/>
+    <GradientStop Color="#2F6FD0" Offset="1"/>
+  </LinearGradientBrush>
+  <SolidColorBrush x:Key="TextOnAccentBrush" Color="#0B0B0B"/>
+
+  <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#202020"/>
+  <SolidColorBrush x:Key="ContentBackgroundBrush" Color="Transparent"/>
+  <SolidColorBrush x:Key="RegionBrush" Color="#E81F1F1F"/>
+  <SolidColorBrush x:Key="SecondaryRegionBrush" Color="#14FFFFFF"/>
+  <SolidColorBrush x:Key="CardBorderBrush" Color="#1FFFFFFF"/>
+  <SolidColorBrush x:Key="BorderBrush" Color="#1FFFFFFF"/>
+  <SolidColorBrush x:Key="DividerBrush" Color="#18FFFFFF"/>
+  <SolidColorBrush x:Key="NavBackgroundBrush" Color="#CC1B1B1B"/>
+  <SolidColorBrush x:Key="TitleBarBrush" Color="Transparent"/>
+  <SolidColorBrush x:Key="ToastBackgroundBrush" Color="#F22A2A2A"/>
+  <SolidColorBrush x:Key="ToastBorderBrush" Color="#2EFFFFFF"/>
+  <SolidColorBrush x:Key="MenuBackgroundBrush" Color="#F22B2B2B"/>
+  <SolidColorBrush x:Key="MenuHoverBrush" Color="#18FFFFFF"/>
+
+  <SolidColorBrush x:Key="PrimaryTextBrush" Color="#F2F4F7"/>
+  <SolidColorBrush x:Key="SecondaryTextBrush" Color="#B4BAC2"/>
+  <SolidColorBrush x:Key="TextTertiaryBrush" Color="#8B9199"/>
+  <SolidColorBrush x:Key="TextDisabledBrush" Color="#6E747C"/>
+
+  <SolidColorBrush x:Key="OkBrush" Color="#4CC38A"/>
+  <SolidColorBrush x:Key="OkLightBrush" Color="#1E3A2C"/>
+  <SolidColorBrush x:Key="WarnBrush" Color="#E8B339"/>
+  <SolidColorBrush x:Key="WarnLightBrush" Color="#3A2F1B"/>
+  <SolidColorBrush x:Key="ErrBrush" Color="#F16A6E"/>
+  <SolidColorBrush x:Key="ErrLightBrush" Color="#3D2224"/>
+  <SolidColorBrush x:Key="DangerBrush" Color="#F16A6E"/>
+  <SolidColorBrush x:Key="InfoBrush" Color="#4C97FF"/>
+  <SolidColorBrush x:Key="InfoLightBrush" Color="#1B2A3D"/>
+
+  <SolidColorBrush x:Key="ControlBrush" Color="#14FFFFFF"/>
+  <SolidColorBrush x:Key="ControlHoverBrush" Color="#1FFFFFFF"/>
+  <SolidColorBrush x:Key="ControlPressedBrush" Color="#0FFFFFFF"/>
+  <SolidColorBrush x:Key="ControlBorderBrush" Color="#33FFFFFF"/>
+  <SolidColorBrush x:Key="InputBackgroundBrush" Color="#1AFFFFFF"/>
+  <SolidColorBrush x:Key="TrackBrush" Color="#2EFFFFFF"/>
+  <SolidColorBrush x:Key="SelectionBrush" Color="#334C97FF"/>
+  <SolidColorBrush x:Key="ScrollThumbBrush" Color="#4DFFFFFF"/>
+  <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#73FFFFFF"/>
+  <SolidColorBrush x:Key="RowHoverBrush" Color="#12FFFFFF"/>
+  <SolidColorBrush x:Key="NavItemHoverBrush" Color="#14FFFFFF"/>
+  <SolidColorBrush x:Key="NavItemActiveBrush" Color="#334C97FF"/>
+  <SolidColorBrush x:Key="NavItemActiveTextBrush" Color="#9CC4FF"/>
+  <SolidColorBrush x:Key="FocusBrush" Color="#4C97FF"/>
+  <SolidColorBrush x:Key="LogBackgroundBrush" Color="#14000000"/>
+  <SolidColorBrush x:Key="BadgeBrush" Color="#1AFFFFFF"/>
+  <SolidColorBrush x:Key="ShadowBrush" Color="#66000000"/>
+</ResourceDictionary>

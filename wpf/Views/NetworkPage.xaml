@@ -1,0 +1,114 @@
+﻿<UserControl x:Class="WinTune.Wpf.Views.NetworkPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="Transparent">
+    <StackPanel Margin="30,26,30,26">
+
+      <TextBlock Text="网络工具" FontSize="24" FontWeight="Bold"/>
+      <TextBlock Text="查看网卡、设置 DNS、Ping 诊断、重置网络栈与编辑 hosts"
+                 Foreground="{DynamicResource SecondaryTextBrush}" FontSize="13" Margin="1,4,0,14" TextWrapping="Wrap"/>
+
+      <!-- 网卡与 DNS -->
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Text="网络适配器" Style="{StaticResource CardTitle}"/>
+          <TextBlock Style="{StaticResource CardSub}" Text="选择一个网卡后可设置 DNS；真实联网状态会校验网关与 APIPA"/>
+          <ListBox x:Name="AdapterList" Background="Transparent" BorderThickness="0" Height="190" Margin="0,0,0,10">
+            <ListBox.ItemContainerStyle>
+              <Style TargetType="ListBoxItem">
+                <Setter Property="Padding" Value="4"/>
+              </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Grid Margin="4">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13.5"/>
+                      <TextBlock Text="{Binding Status}" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center"
+                                 Foreground="{DynamicResource SecondaryTextBrush}"/>
+                    </StackPanel>
+                    <TextBlock FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,2,0,0">
+                      <Run Text="IP "/><Run Text="{Binding Ip, Mode=OneWay}"/><Run Text="   网关 "/><Run Text="{Binding Gateway, Mode=OneWay}"/><Run Text="   "/><Run Text="{Binding SpeedMbps, Mode=OneWay}"/><Run Text=" Mbps"/>
+                    </TextBlock>
+                    <TextBlock FontSize="11.5" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,1,0,0">
+                      <Run Text="DNS: "/><Run Text="{Binding Dns, Mode=OneWay}"/>
+                    </TextBlock>
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+
+          <Grid Margin="0,4,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="260"/>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="DNS 预设：" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <ComboBox x:Name="DnsPreset" Grid.Column="1" SelectedIndex="0"/>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,0">
+              <Button x:Name="ApplyDnsBtn" Content="应用 DNS" Style="{StaticResource BtnPrimary}" Click="ApplyDns_Click"/>
+              <Button x:Name="DhcpDnsBtn" Content="恢复自动获取" Style="{StaticResource BtnDefault}" Click="DhcpDns_Click"/>
+              <Button x:Name="RefreshAdaptersBtn" Content="刷新" Style="{StaticResource BtnGhost}" Click="RefreshAdapters_Click"/>
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- 诊断 -->
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Text="网络诊断与修复" Style="{StaticResource CardTitle}"/>
+          <TextBlock Style="{StaticResource CardSub}" Text="Ping 测试连通性与延迟；重置类操作需要管理员且通常需重启生效"/>
+          <Grid Margin="0,2,0,8">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="260"/>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="PingHost" Grid.Column="0" Text="223.5.5.5"/>
+            <Button Grid.Column="1" Content="Ping" Style="{StaticResource BtnPrimary}" Click="Ping_Click" Margin="8,0,0,0"/>
+            <TextBlock x:Name="PingResult" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0" Text="—"/>
+          </Grid>
+          <WrapPanel>
+            <Button Content="刷新 DNS 缓存" Style="{StaticResource BtnDefault}" Click="FlushDns_Click"/>
+            <Button Content="释放并续租 IP" Style="{StaticResource BtnDefault}" Click="Renew_Click"/>
+            <Button Content="重置 Winsock" Style="{StaticResource BtnDefault}" Click="Winsock_Click"/>
+            <Button Content="重置 TCP/IP 协议栈" Style="{StaticResource BtnDefault}" Click="TcpReset_Click"/>
+          </WrapPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- hosts -->
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+              <TextBlock Text="hosts 文件" Style="{StaticResource CardTitle}" Margin="0,0,0,0"/>
+              <TextBlock Style="{StaticResource CardSub}" Text="可手动添加域名映射；保存需要管理员权限，保存前自动备份"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+              <ToggleButton x:Name="BlockToggle" Style="{StaticResource Switch}" VerticalAlignment="Center" Margin="0,0,8,0" Checked="Block_Changed" Unchecked="Block_Changed"/>
+              <TextBlock Text="遥测拦截" VerticalAlignment="Center" Margin="0,0,12,0"/>
+              <Button Content="重新读取" Style="{StaticResource BtnDefault}" Click="ReadHosts_Click"/>
+              <Button Content="保存" Style="{StaticResource BtnPrimary}" Click="SaveHosts_Click"/>
+            </StackPanel>
+          </Grid>
+          <TextBox x:Name="HostsBox" Height="200" Style="{StaticResource LogBox}" FontFamily="Consolas" AcceptsReturn="True" TextWrapping="NoWrap"/>
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

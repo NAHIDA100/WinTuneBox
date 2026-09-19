@@ -1,6 +1,21 @@
-# ── 构建与发行产物（不入库；发布走 GitHub Releases，见 make-release.ps1）──
+﻿# ── 构建产物不在源码仓库里 ──
+# 源码（本仓库）与发行版（构建输出）**完全分离**：产物默认落在同级目录
+#   ..\WinTuneBox-Release\{dist,release,signing,bin,obj}
+# 路径由 tools\paths.ps1 统一解析，可用 -OutRoot 或 $env:WINTUNEBOX_OUT 覆盖。
+# 下面这些条目是**安全网**：万一有人在仓库里跑了旧版脚本或手工编译，产物也不会被误提交。
 dist/
 release/
+signing/
+bin/
+obj/
+wpf/bin/
+wpf/obj/
+
+# 迁移前的整仓备份（已移到发行版目录的 _Backup\，这里再挡一层）
+_Backup/
+
+# 本地续作笔记
+_PROGRESS_v2.md
 
 # 系统/编辑器杂项
 *.user

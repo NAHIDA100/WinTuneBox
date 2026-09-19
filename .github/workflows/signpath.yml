@@ -1,0 +1,262 @@
+﻿name: signpath-release
+
+# ═══ SignPath.io 代码签名（开源项目免费，需先在 signpath.io 申请并获批）═══
+#
+# 这条流水线用**真实的受信任证书**签名，产物在别人机器上不再提示「未知发布者」。
+# 本地开发仍然走自签名（build.ps1 -Sign / tools\sign.ps1），两者互不影响。
+#
+# ── 接入前提（必须先在外部做完，否则本流水线会整条跳过）──
+#   1. 本仓库已推送到 GitHub，并安装了 SignPath 的 GitHub App
+#   2. signpath.io 上建好 Organization / Project / Signing Policy，
+#      并把 .signpath\binaries.xml 与 .signpath\installers.xml 注册为两条
+#      Artifact Configuration（slug 分别是 wintunebox-binaries / wintunebox-installers）
+#   3. 仓库 Secrets 增加 SIGNPATH_API_TOKEN
+#   4. 仓库 Variables 增加 SIGNPATH_ORG_ID / SIGNPATH_PROJECT_SLUG / SIGNPATH_POLICY_SLUG
+#      详见 README「代码签名 → 换真实证书」。
+#
+# ── 为什么是三个 job（顺序不能变）──
+#   主程序必须先签 → 安装包内嵌的才是已签名 exe → 最后再签安装包自身。
+#   反过来做，用户装完在属性页看到的还是「未知发布者」。
+#
+#   binaries  : 构建 → SignPath 签 WinTuneBox.exe ×2
+#   installers: 用已签名的 exe 打安装包 → SignPath 签 Setup ×2
+#   release   : 组装绿色版 zip + SHA256SUMS，tag 触发时发 Release
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 源码与发行版完全分离（见 tools\paths.ps1）：产物默认落在**同级目录**，
+# 这里钉回 workspace 根，与本地约定一致，且不会写到 checkout 外面。
+env:
+  WINTUNEBOX_OUT: ${{ github.workspace }}
+
+jobs:
+  # ── 未配置 SignPath 时优雅跳过，不刷失败通知 ──
+  check:
+    name: 检查 SignPath 是否已配置
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.c.outputs.ready }}
+    steps:
+      - id: c
+        shell: bash
+        env:
+          # 走 env 而不是直接插值，避免 secret 里的特殊字符被 shell 展开
+          TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=跳过 SignPath::未配置 SIGNPATH_API_TOKEN，见 README「代码签名 → 换真实证书」"
+          fi
+
+  binaries:
+    name: 1) 构建并签名主程序
+    needs: check
+    if: needs.check.outputs.ready == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 构建 v2 双架构（先不签本地证书）
+        shell: pwsh
+        run: ./build.ps1 -Target v2 -Arch both -NoInstaller
+
+      - name: 打包待签名制品（平铺 + ASCII 名，匹配 .signpath\binaries.xml）
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path sign-payload | Out-Null
+          Copy-Item dist/x64/WinTuneBox.exe sign-payload/WinTuneBox-x64.exe
+          Copy-Item dist/x86/WinTuneBox.exe sign-payload/WinTuneBox-x86.exe
+          Compress-Archive -Path sign-payload/* -DestinationPath unsigned-binaries.zip
+          Get-ChildItem sign-payload | Select-Object Name, Length | Format-Table -AutoSize
+
+      - name: 上传待签名制品
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-binaries
+          path: unsigned-binaries.zip
+          if-no-files-found: error
+
+      - name: 提交 SignPath 签名请求
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORG_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          artifact-configuration-slug: wintunebox-binaries
+          github-artifact-name: unsigned-binaries
+          wait-for-completion: true
+          output-artifact-directory: signed-binaries
+
+      - name: 校验签名结果
+        shell: pwsh
+        run: |
+          $bad = 0
+          foreach ($f in Get-ChildItem signed-binaries -Filter *.exe -Recurse) {
+            $v = Get-AuthenticodeSignature $f.FullName
+            Write-Host ("{0}: {1} | {2}" -f $f.Name, $v.Status, $v.SignerCertificate.Subject)
+            if ($v.Status -ne 'Valid') { $bad++ }
+          }
+          if ($bad -gt 0) { throw "有 $bad 个文件的签名不是 Valid" }
+
+      - name: 上传已签名主程序
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-binaries
+          path: signed-binaries/**/*.exe
+          if-no-files-found: error
+
+  installers:
+    name: 2) 打安装包并签名
+    needs: [ check, binaries ]
+    if: needs.check.outputs.ready == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 取回已签名的主程序
+        uses: actions/download-artifact@v4
+        with:
+          name: signed-binaries
+          path: signed
+
+      - name: 安装 Inno Setup 6
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Inno Setup 安装失败: $iscc" }
+          "ISCC=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: 把已签名的主程序放回 dist
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/x64, dist/x86 | Out-Null
+          Copy-Item (Get-ChildItem signed -Filter WinTuneBox-x64.exe -Recurse | Select-Object -First 1).FullName dist/x64/WinTuneBox.exe
+          Copy-Item (Get-ChildItem signed -Filter WinTuneBox-x86.exe -Recurse | Select-Object -First 1).FullName dist/x86/WinTuneBox.exe
+
+      - name: 只打安装包（不重新编译，避免覆盖已签名的 exe）
+        shell: pwsh
+        run: ./build.ps1 -Target v2 -Arch both -InstallerOnly
+
+      - name: 打包待签名制品（匹配 .signpath\installers.xml）
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path sign-payload | Out-Null
+          Copy-Item dist/Setup-Windows优化工具箱-2.0.0-x64.exe sign-payload/Setup-x64.exe
+          Copy-Item dist/Setup-Windows优化工具箱-2.0.0-x86.exe sign-payload/Setup-x86.exe
+          Compress-Archive -Path sign-payload/* -DestinationPath unsigned-installers.zip
+          Get-ChildItem sign-payload | Select-Object Name, Length | Format-Table -AutoSize
+
+      - name: 上传待签名安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installers
+          path: unsigned-installers.zip
+          if-no-files-found: error
+
+      - name: 提交 SignPath 签名请求
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORG_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          artifact-configuration-slug: wintunebox-installers
+          github-artifact-name: unsigned-installers
+          wait-for-completion: true
+          output-artifact-directory: signed-installers
+
+      - name: 校验签名结果
+        shell: pwsh
+        run: |
+          $bad = 0
+          foreach ($f in Get-ChildItem signed-installers -Filter *.exe -Recurse) {
+            $v = Get-AuthenticodeSignature $f.FullName
+            Write-Host ("{0}: {1} | {2}" -f $f.Name, $v.Status, $v.SignerCertificate.Subject)
+            if ($v.Status -ne 'Valid') { $bad++ }
+          }
+          if ($bad -gt 0) { throw "有 $bad 个文件的签名不是 Valid" }
+
+      - name: 上传已签名安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-installers
+          path: signed-installers/**/*.exe
+          if-no-files-found: error
+
+  release:
+    name: 3) 组装发行包
+    needs: [ check, binaries, installers ]
+    if: needs.check.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write          # 仅本 job 需要，用于发 Release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 取回已签名产物
+        uses: actions/download-artifact@v4
+        with:
+          pattern: signed-*
+          path: signed
+
+      - name: 组装绿色版 zip 与校验和
+        shell: pwsh
+        run: |
+          $ver = '2.0.0'
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          $sx64 = (Get-ChildItem signed -Filter WinTuneBox-x64.exe -Recurse | Select-Object -First 1).FullName
+          $sx86 = (Get-ChildItem signed -Filter WinTuneBox-x86.exe -Recurse | Select-Object -First 1).FullName
+          $i64  = (Get-ChildItem signed -Filter Setup-x64.exe -Recurse | Select-Object -First 1).FullName
+          $i86  = (Get-ChildItem signed -Filter Setup-x86.exe -Recurse | Select-Object -First 1).FullName
+
+          foreach ($pair in @(@('x64', $sx64, $i64), @('x86', $sx86, $i86))) {
+            $arch = $pair[0]
+            $tmp  = "zip-$arch"
+            New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+            Copy-Item $pair[1] "$tmp/WinTuneBox.exe"
+            Copy-Item README.md, LICENSE, CHANGELOG.md $tmp
+            Copy-Item disclaimer.txt "$tmp/免责声明.txt"
+            Compress-Archive -Path "$tmp/*" -DestinationPath "release/WinTuneBox-v$ver-$arch-绿色版.zip" -CompressionLevel Optimal
+            Remove-Item $tmp -Recurse -Force
+            Copy-Item $pair[2] "release/Setup-Windows优化工具箱-$ver-$arch.exe"
+          }
+
+          $sb = New-Object System.Text.StringBuilder
+          foreach ($f in Get-ChildItem release -File | Sort-Object Name) {
+            $h = (Get-FileHash $f.FullName -Algorithm SHA256).Hash
+            [void]$sb.AppendLine("$h  $($f.Name)")
+          }
+          [IO.File]::WriteAllText((Resolve-Path release).Path + '/SHA256SUMS.txt', $sb.ToString(), (New-Object System.Text.UTF8Encoding($true)))
+          Get-ChildItem release | Select-Object Name, Length | Format-Table -AutoSize
+
+      - name: 上传发行产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: wintunebox-release
+          path: release/*
+          if-no-files-found: error
+
+      - name: 发布到 GitHub Release（仅 tag 触发）
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
+          body: |
+            签名：本版产物由 **SignPath.io** 使用受信任证书签名（开源项目免费额度），
+            时间戳由 RFC3161 时间戳服务提供。
+
+            校验下载文件的完整性：
+            ```powershell
+            Get-AuthenticodeSignature .\WinTuneBox.exe    # 期望 Valid
+            ```
